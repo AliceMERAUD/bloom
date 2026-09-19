@@ -129,15 +129,17 @@ void main() {
     final map = DataExportService.buildExportMap(
       exportedAt: DateTime.utc(2026, 1, 1),
     );
-    expect(map['version'], 1);
+    expect(map['version'], 2);
     expect(map['app'], 'bloom');
     expect(map['sport'], isA<Map>());
+    expect(map['sportActivities'], isA<Map>());
+    expect(map['sportBag'], isA<Map>());
     expect(map['wellbeing'], isA<Map>());
     expect(map['puzzle'], isA<Map>());
     expect(map['settings'], isA<Map>());
 
     final json = DataExportService.exportJson();
-    expect(json, contains('"version": 1'));
+    expect(json, contains('"version": 2'));
   });
 
   test('Import valide remplace les données', () async {

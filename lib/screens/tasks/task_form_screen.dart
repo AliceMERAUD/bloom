@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 
 import '../../models/task.dart';
+import '../../services/sport_activity_service.dart';
 import '../../services/task_service.dart';
+import '../sport/sport_bag_checklist_sheet.dart';
+import '../sport/sport_bag_screen.dart';
 
 class TaskFormScreen extends StatefulWidget {
   final BloomTask? task;
@@ -22,6 +25,8 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
   DateTime? _dueDate;
   TimeOfDay? _dueTime;
   bool _reminderEnabled = false;
+  int _reminderMinutesBefore = 0;
+  String? _sportId;
   bool _saving = false;
 
   bool get _isEditing => widget.task != null;
@@ -39,6 +44,8 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
       _dueDate = task.dueDate;
       _dueTime = task.dueTime;
       _reminderEnabled = task.reminderEnabled;
+      _reminderMinutesBefore = task.reminderMinutesBefore;
+      _sportId = task.sportId;
     }
   }
 
@@ -72,6 +79,40 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
     }
   }
 
+  Future<void> _openBag() async {
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.checklist),
+              title: const Text('Checklist du sac'),
+              onTap: () => Navigator.pop(ctx, 'checklist'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.backpack_outlined),
+              title: const Text('Ouvrir le sac'),
+              onTap: () => Navigator.pop(ctx, 'bag'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (!mounted || action == null) return;
+    if (action == 'checklist') {
+      await showSportBagChecklistSheet(context, sportId: _sportId);
+    } else {
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => SportBagScreen(initialSportId: _sportId),
+        ),
+      );
+    }
+  }
+
   Future<void> _save() async {
     final title = _titleController.text.trim();
     if (title.isEmpty) {
@@ -83,6 +124,9 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
 
     setState(() => _saving = true);
     try {
+      final linkedSportId =
+          _category == TaskCategory.sport ? _sportId : null;
+
       if (_isEditing) {
         final existing = widget.task!;
         await TaskService.updateTask(
@@ -100,6 +144,9 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
             dueTime: _dueTime,
             clearDueTime: _dueTime == null,
             reminderEnabled: _reminderEnabled && _dueDate != null,
+            reminderMinutesBefore: _reminderMinutesBefore,
+            sportId: linkedSportId,
+            clearSportId: linkedSportId == null,
           ),
         );
       } else {
@@ -114,6 +161,8 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
           dueDate: _dueDate,
           dueTime: _dueTime,
           reminderEnabled: _reminderEnabled && _dueDate != null,
+          reminderMinutesBefore: _reminderMinutesBefore,
+          sportId: linkedSportId,
         );
       }
       if (mounted) Navigator.pop(context);
@@ -157,6 +206,8 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final sports = SportActivityService.getAll(enabledOnly: true);
+
     return Scaffold(
       appBar: AppBar(
         title: Text(_isEditing ? 'Modifier la tâche' : 'Nouvelle tâche'),
@@ -200,10 +251,51 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
                 avatar: Icon(c.icon, size: 16),
                 label: Text(c.label),
                 selected: _category == c,
-                onSelected: (_) => setState(() => _category = c),
+                onSelected: (_) => setState(() {
+                  _category = c;
+                  if (c != TaskCategory.sport) _sportId = null;
+                }),
               );
             }).toList(),
           ),
+          if (_category == TaskCategory.sport) ...[
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String?>(
+              key: ValueKey(_sportId),
+              initialValue: _sportId,
+              decoration: const InputDecoration(
+                labelText: 'Sport lié (optionnel)',
+                border: OutlineInputBorder(),
+              ),
+              items: [
+                const DropdownMenuItem<String?>(
+                  value: null,
+                  child: Text('Aucun'),
+                ),
+                ...sports.map(
+                  (s) => DropdownMenuItem<String?>(
+                    value: s.id,
+                    child: Row(
+                      children: [
+                        Icon(s.icon, size: 18, color: s.color),
+                        const SizedBox(width: 8),
+                        Text(s.name),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+              onChanged: (v) => setState(() => _sportId = v),
+            ),
+            if (_sportId != null) ...[
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                onPressed: _openBag,
+                icon: const Icon(Icons.backpack_outlined),
+                label: const Text('Voir le sac'),
+              ),
+            ],
+          ],
           const SizedBox(height: 12),
           Text('Priorité', style: Theme.of(context).textTheme.titleSmall),
           const SizedBox(height: 8),
@@ -282,13 +374,33 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
             subtitle: Text(
               _dueDate == null
                   ? 'Choisis d’abord une échéance'
-                  : 'Notification à l’échéance',
+                  : 'Notification avant / à l’échéance',
             ),
             value: _reminderEnabled && _dueDate != null,
             onChanged: _dueDate == null
                 ? null
                 : (v) => setState(() => _reminderEnabled = v),
           ),
+          if (_reminderEnabled && _dueDate != null) ...[
+            const SizedBox(height: 8),
+            DropdownButtonFormField<int>(
+              key: ValueKey(_reminderMinutesBefore),
+              initialValue: _reminderMinutesBefore,
+              decoration: const InputDecoration(
+                labelText: 'Rappeler',
+                border: OutlineInputBorder(),
+              ),
+              items: const [
+                DropdownMenuItem(value: 0, child: Text('À l’heure exacte')),
+                DropdownMenuItem(value: 15, child: Text('15 min avant')),
+                DropdownMenuItem(value: 30, child: Text('30 min avant')),
+                DropdownMenuItem(value: 60, child: Text('1 h avant')),
+              ],
+              onChanged: (v) {
+                if (v != null) setState(() => _reminderMinutesBefore = v);
+              },
+            ),
+          ],
           const SizedBox(height: 20),
           FilledButton(
             onPressed: _saving ? null : _save,

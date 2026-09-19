@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../models/wellbeing_enums.dart';
+import '../../services/bloom_refresh.dart';
 import '../../services/dashboard_service.dart';
 import '../../services/workout_session_service.dart';
 import '../../widgets/common/bloom_widgets.dart';
@@ -32,7 +33,18 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    BloomRefresh.version.addListener(_onRefresh);
     _reload();
+  }
+
+  @override
+  void dispose() {
+    BloomRefresh.version.removeListener(_onRefresh);
+    super.dispose();
+  }
+
+  void _onRefresh() {
+    if (mounted) _reload();
   }
 
   Future<void> _reload() async {
@@ -168,6 +180,24 @@ class _HomeScreenState extends State<HomeScreen> {
                       icon: Icons.checklist,
                       label: 'Tâches à faire',
                       value: '${data.pendingTaskCount}',
+                    ),
+                    const SizedBox(height: 8),
+                    BloomStatChip(
+                      icon: Icons.warning_amber_outlined,
+                      label: 'Tâches en retard',
+                      value: '${data.overdueTaskCount}',
+                    ),
+                    const SizedBox(height: 8),
+                    BloomStatChip(
+                      icon: Icons.today_outlined,
+                      label: 'À faire aujourd’hui',
+                      value: '${data.dueTodayTaskCount}',
+                    ),
+                    const SizedBox(height: 8),
+                    BloomStatChip(
+                      icon: Icons.check_circle_outline,
+                      label: 'Terminées aujourd’hui',
+                      value: '${data.completedTasksToday}',
                     ),
                     const SizedBox(height: 8),
                     BloomStatChip(

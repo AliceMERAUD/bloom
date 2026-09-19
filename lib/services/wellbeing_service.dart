@@ -1,10 +1,13 @@
 import '../models/wellbeing_entry.dart';
 import '../models/wellbeing_enums.dart';
+import 'bloom_refresh.dart';
 import 'storage_service.dart';
 
 class WellbeingService {
-  static Future<WellbeingEntry> saveEntry(WellbeingEntry entry) {
-    return StorageService.saveWellbeingEntry(entry);
+  static Future<WellbeingEntry> saveEntry(WellbeingEntry entry) async {
+    final saved = await StorageService.saveWellbeingEntry(entry);
+    BloomRefresh.notify();
+    return saved;
   }
 
   static WellbeingEntry? getEntryForDate(DateTime date) {

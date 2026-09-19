@@ -50,17 +50,23 @@ class PuzzlePosition {
   final String id;
   final int index;
   final String? label;
+  final int? row;
+  final int? col;
 
   const PuzzlePosition({
     required this.id,
     required this.index,
     this.label,
+    this.row,
+    this.col,
   });
 
   Map<String, dynamic> toMap() => {
         'id': id,
         'index': index,
         'label': label,
+        'row': row,
+        'col': col,
       };
 
   factory PuzzlePosition.fromMap(Map<dynamic, dynamic> map) {
@@ -69,6 +75,8 @@ class PuzzlePosition {
       id: data['id'] as String,
       index: (data['index'] as num).toInt(),
       label: data['label'] as String?,
+      row: (data['row'] as num?)?.toInt(),
+      col: (data['col'] as num?)?.toInt(),
     );
   }
 }

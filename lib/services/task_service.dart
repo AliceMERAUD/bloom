@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 
 import '../models/app_settings.dart';
+import '../models/sport_activity.dart';
 import '../models/task.dart';
+import 'bloom_refresh.dart';
 import 'reminder_service.dart';
 import 'settings_service.dart';
+import 'sport_activity_service.dart';
+import 'sport_bag_service.dart';
 import 'storage_service.dart';
 
 /// Business logic for daily-life tasks (local-only).
@@ -18,6 +22,12 @@ class TaskService {
 
   static List<BloomTask> getDueTodayPending() =>
       getPendingTasks().where((t) => t.isDueToday || t.isOverdue).toList();
+
+  static int overdueCount() =>
+      getPendingTasks().where((t) => t.isOverdue).length;
+
+  static int dueTodayCount() =>
+      getPendingTasks().where((t) => t.isDueToday && !t.isOverdue).length;
 
   static int completedTodayCount() {
     final now = DateTime.now();
@@ -39,6 +49,8 @@ class TaskService {
     TimeOfDay? dueTime,
     TaskRecurrence recurrence = TaskRecurrence.none,
     bool reminderEnabled = false,
+    int reminderMinutesBefore = 0,
+    String? sportId,
   }) async {
     final id = DateTime.now().microsecondsSinceEpoch.toString();
     final reminderId =
@@ -60,10 +72,13 @@ class TaskService {
       recurrence: recurrence,
       reminderEnabled: reminderEnabled,
       reminderId: reminderId,
+      reminderMinutesBefore: reminderMinutesBefore,
+      sportId: sportId,
     );
 
     await StorageService.saveTask(task);
     await _syncReminder(task);
+    BloomRefresh.notify();
     return task;
   }
 
@@ -88,6 +103,7 @@ class TaskService {
 
     await StorageService.saveTask(updated);
     await _syncReminder(updated);
+    BloomRefresh.notify();
     return updated;
   }
 
@@ -97,6 +113,7 @@ class TaskService {
       await ReminderService.cancelId(task!.reminderId!);
     }
     await StorageService.deleteTask(id);
+    BloomRefresh.notify();
   }
 
   /// Marks complete and creates the next occurrence for recurring tasks once.
@@ -127,6 +144,7 @@ class TaskService {
     }
 
     await StorageService.saveTask(completed);
+    BloomRefresh.notify();
     return completed;
   }
 
@@ -142,6 +160,7 @@ class TaskService {
       clearCompletedAt: true,
     );
     await StorageService.saveTask(reopened);
+    BloomRefresh.notify();
     return reopened;
   }
 
@@ -177,6 +196,8 @@ class TaskService {
       reminderId: reminderEnabled
           ? ReminderService.notificationIdForTask(id)
           : null,
+      reminderMinutesBefore: completed.reminderMinutesBefore,
+      sportId: completed.sportId,
     );
   }
 
@@ -198,26 +219,59 @@ class TaskService {
       return;
     }
 
+    final copy = _notificationCopy(task);
     await ReminderService.scheduleAt(
       id: task.reminderId!,
-      title: 'Bloom — Tâche',
-      body: task.title,
+      title: copy.$1,
+      body: copy.$2,
       when: when,
     );
+  }
+
+  /// Pure helper for tests: title + body for a task reminder.
+  static (String, String) notificationCopyFor(BloomTask task) =>
+      _notificationCopy(task);
+
+  static (String, String) _notificationCopy(BloomTask task) {
+    SportActivity? sport;
+    if (task.sportId != null) {
+      sport = SportActivityService.getById(task.sportId!);
+    }
+
+    final hasBag = task.sportId != null &&
+        SportBagService.checklistFor(task.sportId).isNotEmpty;
+
+    if (sport != null || task.category == TaskCategory.sport) {
+      final name = sport?.name ?? task.title;
+      final title = 'Bloom — Sport';
+      final lead = task.reminderMinutesBefore > 0
+          ? 'dans ${task.reminderMinutesBefore} min'
+          : 'c’est l’heure';
+      final body = hasBag
+          ? '🏊 $name $lead — pense à ton sac !'
+          : '🏊 C’est bientôt l’heure de $name !';
+      return (title, body);
+    }
+
+    return ('Bloom — Tâche', task.title);
   }
 
   static DateTime? _reminderDateTime(BloomTask task) {
     if (task.dueDate == null) return null;
     final hour = task.dueTime?.hour ?? 9;
     final minute = task.dueTime?.minute ?? 0;
-    return DateTime(
+    final due = DateTime(
       task.dueDate!.year,
       task.dueDate!.month,
       task.dueDate!.day,
       hour,
       minute,
     );
+    return due.subtract(Duration(minutes: task.reminderMinutesBefore));
   }
+
+  /// Exposed for unit tests.
+  static DateTime? reminderFireAt(BloomTask task) => _reminderDateTime(task);
 
   /// Reschedule reminders for all pending tasks (after settings change).
   static Future<void> rescheduleAllReminders(AppSettings settings) async {

@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
 
 class BloomTheme {
-  static const Color seed = Color(0xFFE8A7C4);
-  static const Color scaffoldLight = Color(0xFFFFFBFD);
-  static const Color scaffoldDark = Color(0xFF1A1518);
+  /// Soft green brand seed — Bloom identity.
+  static const Color seed = Color(0xFF3D8B6E);
+  static const Color accentGreen = Color(0xFF2E7D4F);
+  static const Color scaffoldLight = Color(0xFFF4FAF6);
+  static const Color scaffoldDark = Color(0xFF121A16);
 
   static ThemeData light() {
     final scheme = ColorScheme.fromSeed(
       seedColor: seed,
       brightness: Brightness.light,
+      primary: accentGreen,
     );
     return ThemeData(
       useMaterial3: true,

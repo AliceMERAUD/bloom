@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
 
+import '../../models/sport_activity.dart';
 import '../../services/exercise_service.dart';
+import '../../services/sport_activity_service.dart';
 import '../../services/workout_session_service.dart';
 import 'exercise_screen.dart';
 import 'history_screen.dart';
 import 'next_session_screen.dart';
+import 'sport_activities_screen.dart';
+import 'sport_activity_form_screen.dart';
+import 'sport_bag_screen.dart';
 import 'workout_summary_screen.dart';
 
 class SportScreen extends StatefulWidget {
@@ -16,12 +21,26 @@ class SportScreen extends StatefulWidget {
 
 class _SportScreenState extends State<SportScreen> {
   bool hasOpenSession = false;
+  List<SportActivity> _activities = [];
 
   @override
   void initState() {
     super.initState();
     hasOpenSession = WorkoutSessionService.hasOpenSession;
+    _reloadActivities();
     _refreshSessionState();
+  }
+
+  void _reloadActivities() {
+    List<SportActivity> activities = const [];
+    try {
+      activities = SportActivityService.getAll();
+    } catch (_) {
+      // Hive may be unavailable in widget tests / edge cases.
+    }
+    setState(() {
+      _activities = activities;
+    });
   }
 
   Future<void> _refreshSessionState() async {
@@ -218,72 +237,176 @@ class _SportScreenState extends State<SportScreen> {
           ),
         ],
       ),
-      body: Column(
-              children: [
-                if (hasOpenSession)
-                  Card(
-                    margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-                    color: Theme.of(context).colorScheme.secondaryContainer,
-                    child: Padding(
-                      padding: const EdgeInsets.all(12),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.timelapse),
-                          const SizedBox(width: 12),
-                          const Expanded(
-                            child: Text(
-                              'Séance en cours — logge des séries ou termine.',
-                            ),
-                          ),
-                          TextButton(
-                            onPressed: _endSessionPressed,
-                            child: const Text('Terminer'),
-                          ),
-                        ],
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+        children: [
+          if (hasOpenSession)
+            Card(
+              margin: const EdgeInsets.only(bottom: 16),
+              color: Theme.of(context).colorScheme.secondaryContainer,
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Row(
+                  children: [
+                    const Icon(Icons.timelapse),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Text(
+                        'Séance en cours — logge des séries ou termine.',
                       ),
                     ),
+                    TextButton(
+                      onPressed: _endSessionPressed,
+                      child: const Text('Terminer'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () async {
+                    await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const SportActivitiesScreen(),
+                      ),
+                    );
+                    if (mounted) _reloadActivities();
+                  },
+                  icon: const Icon(Icons.sports),
+                  label: const Text('Mes sports'),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () async {
+                    await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const SportBagScreen(),
+                      ),
+                    );
+                    if (mounted) _reloadActivities();
+                  },
+                  icon: const Icon(Icons.backpack_outlined),
+                  label: const Text('Sac de sport'),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Activités',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                ),
+              ),
+              TextButton.icon(
+                onPressed: () async {
+                  await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const SportActivityFormScreen(),
+                    ),
+                  );
+                  if (mounted) _reloadActivities();
+                },
+                icon: const Icon(Icons.add, size: 18),
+                label: const Text('Ajouter'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          if (_activities.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 12),
+              child: Text('Aucun sport enregistré.'),
+            )
+          else
+            ..._activities.map(
+              (activity) => Card(
+                margin: const EdgeInsets.only(bottom: 8),
+                child: ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: activity.color.withValues(alpha: 0.2),
+                    child: Icon(activity.icon, color: activity.color),
                   ),
-                Expanded(
-                  child: ListView.builder(
-                    padding: const EdgeInsets.all(16),
-                    itemCount: exercises.length,
-                    itemBuilder: (context, index) {
-                      final exercise = exercises[index];
-
-                      return Card(
-                        margin: const EdgeInsets.only(bottom: 12),
-                        child: ListTile(
-                          leading: const CircleAvatar(
-                            child: Icon(Icons.fitness_center),
-                          ),
-                          title: Text(
-                            exercise.name,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          subtitle: Text(exercise.description ?? ''),
-                          trailing: const Icon(Icons.chevron_right),
-                          onTap: () async {
-                            await Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => ExerciseScreen(
-                                  exercise: exercise,
-                                ),
-                              ),
-                            );
-                            if (mounted) {
-                              await _refreshSessionState();
-                            }
-                          },
-                        ),
-                      );
-                    },
+                  title: Text(activity.name),
+                  subtitle: Text(
+                    activity.description ??
+                        (activity.builtin ? 'Sport intégré' : ''),
+                  ),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () async {
+                    if (activity.id == kBuiltinStrengthSportId) {
+                      return;
+                    }
+                    await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            SportActivityFormScreen(activity: activity),
+                      ),
+                    );
+                    if (mounted) _reloadActivities();
+                  },
+                ),
+              ),
+            ),
+          const SizedBox(height: 20),
+          Text(
+            'Musculation',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Exercices et séances de force',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+          const SizedBox(height: 12),
+          ...exercises.map(
+            (exercise) => Card(
+              margin: const EdgeInsets.only(bottom: 12),
+              child: ListTile(
+                leading: const CircleAvatar(
+                  child: Icon(Icons.fitness_center),
+                ),
+                title: Text(
+                  exercise.name,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
-              ],
+                subtitle: Text(exercise.description ?? ''),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () async {
+                  await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => ExerciseScreen(
+                        exercise: exercise,
+                      ),
+                    ),
+                  );
+                  if (mounted) {
+                    await _refreshSessionState();
+                  }
+                },
+              ),
             ),
+          ),
+        ],
+      ),
     );
   }
 }

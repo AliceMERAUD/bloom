@@ -1,4 +1,5 @@
 import '../models/puzzle/puzzle_models.dart';
+import 'bloom_refresh.dart';
 import 'puzzle_catalog.dart';
 import 'storage_service.dart';
 
@@ -92,6 +93,7 @@ class PuzzleProgressService {
       selectedPuzzleId: puzzleId,
     );
     await save(updated);
+    BloomRefresh.notify();
     return updated;
   }
 
