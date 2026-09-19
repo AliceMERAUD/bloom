@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../models/workout_plan.dart';
 import '../../services/exercise_service.dart';
 import '../../services/progression_service.dart';
+import '../../services/workout_session_service.dart';
 import 'workout_screen.dart';
 
 class NextWorkoutScreen extends StatefulWidget {
@@ -129,16 +130,24 @@ class _NextWorkoutScreenState extends State<NextWorkoutScreen> {
         SizedBox(
           height: 52,
           child: ElevatedButton.icon(
-            onPressed: () {
-                Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                    builder: (_) => WorkoutScreen(
-                        plans: [currentPlan],
-                        ),
-                    ),
-                );
-                },
+            onPressed: () async {
+              await WorkoutSessionService.ensureActiveSession();
+
+              if (!mounted) return;
+
+              await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => WorkoutScreen(
+                    plans: [currentPlan],
+                  ),
+                ),
+              );
+
+              if (mounted) {
+                Navigator.pop(context);
+              }
+            },
             icon: const Icon(Icons.play_arrow),
             label: const Text(
               'Commencer la séance',

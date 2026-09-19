@@ -18,7 +18,14 @@ class ProgressionService {
       );
     }
 
-    final lastSets = sets.reversed.take(4).toList();
+    // Prefer chronological order so "last sets" reflect real recent work.
+    final ordered = [...sets]..sort((a, b) {
+      final aDate = a.date ?? DateTime.fromMillisecondsSinceEpoch(0);
+      final bDate = b.date ?? DateTime.fromMillisecondsSinceEpoch(0);
+      return aDate.compareTo(bDate);
+    });
+
+    final lastSets = ordered.reversed.take(4).toList();
 
     final averageRepetitions =
         lastSets.fold<double>(

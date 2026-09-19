@@ -15,6 +15,11 @@ class StorageService {
 
   /// Initialise Hive avec un chemin local (tests unitaires).
   static Future<void> initForTesting(String path) async {
+    try {
+      await Hive.close();
+    } catch (_) {
+      // Ignore if Hive was not open.
+    }
     Hive.init(path);
     await Hive.openBox(workoutBoxName);
     await Hive.openBox(workoutSessionBoxName);
@@ -111,6 +116,19 @@ class StorageService {
     }
 
     return WorkoutSession.fromMap(session as Map);
+  }
+
+  static List<WorkoutSession> getAllSessions() {
+    final sessions = _sessionBox.values
+        .map((value) => WorkoutSession.fromMap(value as Map))
+        .toList();
+
+    sessions.sort((a, b) => b.startedAt.compareTo(a.startedAt));
+    return sessions;
+  }
+
+  static List<WorkoutSession> getOpenSessions() {
+    return getAllSessions().where((session) => session.isOpen).toList();
   }
 
   static Future<List<WorkoutSet>> getSessionSets(

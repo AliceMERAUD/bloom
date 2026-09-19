@@ -13,9 +13,11 @@ void main() {
   setUp(() async {
     tempDir = await Directory.systemTemp.createTemp('bloom_hive_');
     await StorageService.initForTesting(tempDir.path);
+    WorkoutSessionService.resetForTesting();
   });
 
   tearDown(() async {
+    WorkoutSessionService.resetForTesting();
     await StorageService.closeForTesting();
     if (await tempDir.exists()) {
       await tempDir.delete(recursive: true);
