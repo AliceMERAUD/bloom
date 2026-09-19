@@ -2,8 +2,12 @@ import 'package:flutter/material.dart';
 
 import '../../models/puzzle/puzzle.dart';
 import '../../models/puzzle/puzzle_models.dart';
+import '../../models/puzzle/puzzle_scene.dart';
 import '../../services/puzzle_catalog.dart';
 import '../../services/puzzle_progress_service.dart';
+import '../../widgets/puzzle/puzzle_character_widget.dart';
+import '../../widgets/puzzle/puzzle_constraint_feedback.dart';
+import '../../widgets/puzzle/puzzle_scene_board.dart';
 
 class PuzzlePlayScreen extends StatefulWidget {
   final String puzzleId;
@@ -14,10 +18,14 @@ class PuzzlePlayScreen extends StatefulWidget {
   });
 
   @override
-  State<PuzzlePlayScreen> createState() => _PuzzlePlayScreenState();
+  State<PuzzlePlayScreen> createState() => PuzzlePlayScreenState();
 }
 
-class _PuzzlePlayScreenState extends State<PuzzlePlayScreen> {
+class PuzzlePlayScreenState extends State<PuzzlePlayScreen> {
+  /// When true, skips Hive writes (widget tests).
+  @visibleForTesting
+  static bool suppressPersistence = false;
+
   late Puzzle puzzle;
   late PuzzlePlacement placement;
   String? selectedCharacterId;
@@ -32,20 +40,34 @@ class _PuzzlePlayScreenState extends State<PuzzlePlayScreen> {
     placement = saved ?? const PuzzlePlacement();
   }
 
-  Future<void> _persist() async {
-    await PuzzleProgressService.savePlacement(puzzle.id, placement);
+  void _schedulePersist() {
+    if (suppressPersistence) return;
+    PuzzleProgressService.savePlacement(puzzle.id, placement);
   }
 
   void _selectCharacter(String characterId) {
     setState(() {
-      selectedCharacterId = selectedCharacterId == characterId
-          ? null
-          : characterId;
+      selectedCharacterId =
+          selectedCharacterId == characterId ? null : characterId;
       lastResult = null;
     });
   }
 
-  Future<void> _tapSeat(int index) async {
+  /// Exposed for widget tests (avoids flaky hit-testing with animated trays).
+  @visibleForTesting
+  void debugSelectCharacter(String characterId) => _selectCharacter(characterId);
+
+  @visibleForTesting
+  void debugTapSeat(int index) => _tapSeat(index);
+
+  @visibleForTesting
+  void debugVerify({bool showSuccessDialog = true}) =>
+      _verify(showSuccessDialog: showSuccessDialog);
+
+  @visibleForTesting
+  void debugReset() => _reset();
+
+  void _tapSeat(int index) {
     final occupant = placement.characterAt(index);
 
     if (selectedCharacterId == null) {
@@ -62,7 +84,7 @@ class _PuzzlePlayScreenState extends State<PuzzlePlayScreen> {
         lastResult = null;
         solved = false;
       });
-      await _persist();
+      _schedulePersist();
       return;
     }
 
@@ -73,7 +95,7 @@ class _PuzzlePlayScreenState extends State<PuzzlePlayScreen> {
         lastResult = null;
         solved = false;
       });
-      await _persist();
+      _schedulePersist();
       return;
     }
 
@@ -83,20 +105,22 @@ class _PuzzlePlayScreenState extends State<PuzzlePlayScreen> {
       lastResult = null;
       solved = false;
     });
-    await _persist();
+    _schedulePersist();
   }
 
-  Future<void> _reset() async {
+  void _reset() {
     setState(() {
       placement = const PuzzlePlacement();
       selectedCharacterId = null;
       lastResult = null;
       solved = false;
     });
-    await PuzzleProgressService.clearPlacement(puzzle.id);
+    if (!suppressPersistence) {
+      PuzzleProgressService.clearPlacement(puzzle.id);
+    }
   }
 
-  Future<void> _verify() async {
+  void _verify({bool showSuccessDialog = true}) {
     final result = PuzzleValidator.validate(
       puzzle: puzzle,
       placement: placement,
@@ -108,14 +132,18 @@ class _PuzzlePlayScreenState extends State<PuzzlePlayScreen> {
     });
 
     if (result.isSolved) {
-      await PuzzleProgressService.markCompleted(puzzle.id);
-      if (!mounted) return;
-      await showDialog<void>(
+      if (!suppressPersistence) {
+        PuzzleProgressService.markCompleted(puzzle.id);
+      }
+      if (!mounted || !showSuccessDialog) return;
+      showDialog<void>(
         context: context,
         builder: (dialogContext) {
           return AlertDialog(
             title: const Text('Bravo !'),
-            content: const Text('Toutes les contraintes sont respectées.'),
+            content: const Text(
+              'Toutes les contraintes sont respectées. Tu peux passer au suivant.',
+            ),
             actions: [
               FilledButton(
                 onPressed: () => Navigator.pop(dialogContext),
@@ -135,7 +163,7 @@ class _PuzzlePlayScreenState extends State<PuzzlePlayScreen> {
     }
   }
 
-  Future<void> _nextPuzzle() async {
+  void _nextPuzzle() {
     final index = PuzzleCatalog.indexOf(puzzle.id);
     if (index < 0 || index >= PuzzleCatalog.all.length - 1) {
       Navigator.pop(context);
@@ -153,7 +181,6 @@ class _PuzzlePlayScreenState extends State<PuzzlePlayScreen> {
       return;
     }
 
-    if (!mounted) return;
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(
@@ -164,253 +191,169 @@ class _PuzzlePlayScreenState extends State<PuzzlePlayScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final progress = PuzzleProgressService.load();
+    final puzzleIndex = PuzzleCatalog.indexOf(puzzle.id) + 1;
     final unplaced = puzzle.characters
         .where((c) => placement.indexOf(c.id) == null)
         .toList();
+    final scene = PuzzleSceneTheme.forScenario(puzzle.scenario);
+    final canGoNext = solved || progress.isCompleted(puzzle.id);
 
     return Scaffold(
       appBar: AppBar(
         title: Text(puzzle.title),
-      ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          Text(
-            puzzle.difficulty.label,
-            style: TextStyle(
-              color: Theme.of(context).colorScheme.primary,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(puzzle.description),
-          const SizedBox(height: 8),
-          Text(
-            'Scénario : ${puzzle.scenario}',
-            style: const TextStyle(fontStyle: FontStyle.italic),
-          ),
-          const SizedBox(height: 20),
-          const Text(
-            'Places',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 10),
-          _SeatsRow(
-            puzzle: puzzle,
-            placement: placement,
-            selectedCharacterId: selectedCharacterId,
-            onTapSeat: _tapSeat,
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            'Touche un personnage puis une place. '
-            'Retouche une place occupée pour échanger ou retirer.',
-            style: TextStyle(fontSize: 13),
-          ),
-          const SizedBox(height: 20),
-          const Text(
-            'Personnages',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 10),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              ...unplaced.map((character) {
-                final selected = selectedCharacterId == character.id;
-                return ChoiceChip(
-                  label: Text(character.name),
-                  selected: selected,
-                  avatar: CircleAvatar(
-                    child: Text(
-                      character.name.isEmpty
-                          ? '?'
-                          : character.name[0].toUpperCase(),
-                      style: const TextStyle(fontSize: 12),
-                    ),
-                  ),
-                  onSelected: (_) => _selectCharacter(character.id),
-                );
-              }),
-              ...puzzle.characters
-                  .where((c) => placement.indexOf(c.id) != null)
-                  .map((character) {
-                final selected = selectedCharacterId == character.id;
-                return FilterChip(
-                  label: Text(
-                    '${character.name} · ${placement.indexOf(character.id)! + 1}',
-                  ),
-                  selected: selected,
-                  onSelected: (_) => _selectCharacter(character.id),
-                );
-              }),
-            ],
-          ),
-          const SizedBox(height: 24),
-          const Text(
-            'Contraintes',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 10),
-          ..._constraintTiles(),
-          const SizedBox(height: 24),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: _reset,
-                  child: const Text('Réinitialiser'),
-                ),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 12),
+            child: Center(
+              child: Text(
+                '$puzzleIndex / ${PuzzleCatalog.all.length}',
+                style: const TextStyle(fontWeight: FontWeight.w600),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: FilledButton(
-                  onPressed: _verify,
-                  child: const Text('Vérifier'),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton.tonal(
-              onPressed: solved ||
-                      PuzzleProgressService.load().isCompleted(puzzle.id)
-                  ? _nextPuzzle
-                  : null,
-              child: const Text('Puzzle suivant'),
             ),
           ),
         ],
       ),
-    );
-  }
-
-  List<Widget> _constraintTiles() {
-    final checks = lastResult?.checks;
-    return puzzle.constraints.asMap().entries.map((entry) {
-      final constraint = entry.value;
-      final check = checks
-          ?.where((c) => c.constraint.id == constraint.id)
-          .firstOrNull;
-
-      IconData icon = Icons.circle_outlined;
-      Color? color;
-      if (check != null) {
-        if (!check.evaluable) {
-          icon = Icons.help_outline;
-          color = Colors.grey;
-        } else if (check.satisfied) {
-          icon = Icons.check_circle;
-          color = Colors.green;
-        } else {
-          icon = Icons.cancel;
-          color = Colors.redAccent;
-        }
-      }
-
-      return Card(
-        child: ListTile(
-          leading: Icon(icon, color: color),
-          title: Text(_describe(constraint.description)),
-        ),
-      );
-    }).toList();
-  }
-
-  String _describe(String raw) {
-    var text = raw;
-    for (final character in puzzle.characters) {
-      text = text.replaceAll(character.id, character.name);
-    }
-    return text;
-  }
-}
-
-class _SeatsRow extends StatelessWidget {
-  final Puzzle puzzle;
-  final PuzzlePlacement placement;
-  final String? selectedCharacterId;
-  final Future<void> Function(int index) onTapSeat;
-
-  const _SeatsRow({
-    required this.puzzle,
-    required this.placement,
-    required this.selectedCharacterId,
-    required this.onTapSeat,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: puzzle.positions.map((position) {
-        final characterId = placement.characterAt(position.index);
-        final character = characterId == null
-            ? null
-            : puzzle.characterById(characterId);
-        final highlight = characterId != null &&
-            characterId == selectedCharacterId;
-
-        return Expanded(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 3),
-            child: AspectRatio(
-              aspectRatio: 0.75,
-              child: InkWell(
-                onTap: () => onTapSeat(position.index),
-                borderRadius: BorderRadius.circular(12),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 180),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: highlight
-                          ? Theme.of(context).colorScheme.primary
-                          : Theme.of(context).dividerColor,
-                      width: highlight ? 2.5 : 1,
-                    ),
-                    color: highlight
-                        ? Theme.of(context)
-                            .colorScheme
-                            .primary
-                            .withValues(alpha: 0.12)
-                        : Theme.of(context).colorScheme.surfaceContainerHighest,
+      body: SafeArea(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+              child: Row(
+                children: [
+                  Chip(
+                    label: Text(puzzle.difficulty.label),
+                    visualDensity: VisualDensity.compact,
                   ),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        position.label ?? '${position.index + 1}',
-                        style: const TextStyle(fontSize: 11),
-                      ),
-                      const SizedBox(height: 6),
-                        CircleAvatar(
-                        radius: 16,
-                        child: Text(
-                          character == null
-                              ? '·'
-                              : character.name.isEmpty
-                                  ? '?'
-                                  : character.name[0].toUpperCase(),
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        character?.name ?? '',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontSize: 11),
-                      ),
-                    ],
+                  const SizedBox(width: 8),
+                  Chip(
+                    avatar: Icon(scene.motifIcon, size: 16),
+                    label: Text(scene.title),
+                    visualDensity: VisualDensity.compact,
                   ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+              child: Text(
+                puzzle.description,
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+            ),
+            Expanded(
+              flex: 5,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: PuzzleSceneBoard(
+                  puzzle: puzzle,
+                  placement: placement,
+                  selectedCharacterId: selectedCharacterId,
+                  onTapSeat: _tapSeat,
                 ),
               ),
             ),
-          ),
-        );
-      }).toList(),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  unplaced.isEmpty
+                      ? 'Tous les personnages sont placés'
+                      : 'Personnages à placer',
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ),
+            ),
+            SizedBox(
+              height: 108,
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                children: [
+                  ...unplaced.map(
+                    (character) => Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: PuzzleCharacterWidget(
+                        character: character,
+                        pose: CharacterPose.walking,
+                        selected: selectedCharacterId == character.id,
+                        size: 44,
+                        onTap: () => _selectCharacter(character.id),
+                      ),
+                    ),
+                  ),
+                  ...puzzle.characters
+                      .where((c) => placement.indexOf(c.id) != null)
+                      .map(
+                        (character) => Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: PuzzleCharacterWidget(
+                            character: character,
+                            pose: CharacterPose.sitting,
+                            placed: true,
+                            selected: selectedCharacterId == character.id,
+                            size: 44,
+                            onTap: () => _selectCharacter(character.id),
+                          ),
+                        ),
+                      ),
+                ],
+              ),
+            ),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16),
+              child: Text(
+                'Touche un personnage puis une place. '
+                'Retouche pour retirer ou échanger.',
+                style: TextStyle(fontSize: 12),
+              ),
+            ),
+            Expanded(
+              flex: 3,
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+                child: PuzzleConstraintFeedback(
+                  puzzle: puzzle,
+                  result: lastResult,
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: _reset,
+                          child: const Text('Réinitialiser'),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: FilledButton(
+                          onPressed: _verify,
+                          child: const Text('Vérifier'),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.tonal(
+                      onPressed: canGoNext ? _nextPuzzle : null,
+                      child: const Text('Puzzle suivant'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

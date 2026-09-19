@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../models/puzzle/puzzle.dart';
 import '../../models/puzzle/puzzle_models.dart';
+import '../../models/puzzle/puzzle_scene.dart';
 import '../../services/puzzle_catalog.dart';
 import '../../services/puzzle_progress_service.dart';
 import 'puzzle_play_screen.dart';
@@ -73,18 +74,24 @@ class _PuzzleScreenState extends State<PuzzleScreen> {
             final puzzle = entry.value;
             final unlocked = progress.isUnlocked(puzzle.id);
             final completed = progress.isCompleted(puzzle.id);
+            final scene = PuzzleSceneTheme.forScenario(puzzle.scenario);
 
             return Card(
               margin: const EdgeInsets.only(bottom: 10),
               child: ListTile(
                 leading: CircleAvatar(
-                  child: Text(
-                    completed
-                        ? '✓'
-                        : unlocked
-                            ? '$index'
-                            : '🔒',
-                  ),
+                  backgroundColor: scene.accentColor.withValues(alpha: 0.35),
+                  child: completed
+                      ? const Icon(Icons.check, color: Colors.black87)
+                      : unlocked
+                          ? Text(
+                              '$index',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Colors.black87,
+                              ),
+                            )
+                          : const Icon(Icons.lock_outline, size: 18),
                 ),
                 title: Text(
                   puzzle.title,
@@ -93,8 +100,17 @@ class _PuzzleScreenState extends State<PuzzleScreen> {
                     color: unlocked ? null : Colors.grey,
                   ),
                 ),
-                subtitle: Text(
-                  '${puzzle.difficulty.label} • ${puzzle.scenario}',
+                subtitle: Row(
+                  children: [
+                    Icon(scene.motifIcon, size: 14, color: scene.accentColor),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: Text(
+                        '${puzzle.difficulty.label} • ${scene.title}',
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
                 ),
                 trailing: unlocked
                     ? const Icon(Icons.chevron_right)
