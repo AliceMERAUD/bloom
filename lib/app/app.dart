@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../screens/home/home_screen.dart';
+import '../screens/shell/main_shell.dart';
+import '../services/settings_service.dart';
 import 'theme.dart';
 
 class BloomApp extends StatelessWidget {
@@ -8,11 +9,18 @@ class BloomApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Bloom',
-      debugShowCheckedModeBanner: false,
-      theme: BloomTheme.light(),
-      home: const HomeScreen(),
+    return ValueListenableBuilder(
+      valueListenable: SettingsService.notifier,
+      builder: (context, settings, _) {
+        return MaterialApp(
+          title: 'Bloom',
+          debugShowCheckedModeBanner: false,
+          theme: BloomTheme.light(),
+          darkTheme: BloomTheme.dark(),
+          themeMode: settings.themeMode,
+          home: const MainShell(),
+        );
+      },
     );
   }
 }

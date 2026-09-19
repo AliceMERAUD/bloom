@@ -14,6 +14,10 @@ dependencies:
   cupertino_icons: ^1.0.8
   hive: ^2.2.3
   hive_flutter: ^1.1.0
+  # Local reminders only (no push / no server).
+  flutter_local_notifications: ^18.0.1
+  timezone: ^0.10.0
+  path_provider: ^2.1.5
 
 dev_dependencies:
   flutter_test:
