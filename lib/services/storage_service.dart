@@ -1,5 +1,6 @@
 import 'package:hive_flutter/hive_flutter.dart';
 
+import '../models/app_settings.dart';
 import '../models/wellbeing_entry.dart';
 import '../models/workout_session.dart';
 import '../models/workout_set.dart';
@@ -10,6 +11,7 @@ class StorageService {
   static const String workoutSessionBoxName = 'workout_sessions';
   static const String wellbeingBoxName = 'wellbeing_entries';
   static const String puzzleProgressBoxName = 'puzzle_progress';
+  static const String settingsBoxName = 'app_settings';
 
   static Future<void> init() async {
     await Hive.initFlutter();
@@ -17,6 +19,7 @@ class StorageService {
     await Hive.openBox(workoutSessionBoxName);
     await Hive.openBox(wellbeingBoxName);
     await Hive.openBox(puzzleProgressBoxName);
+    await Hive.openBox(settingsBoxName);
   }
 
   /// Initialise Hive avec un chemin local (tests unitaires).
@@ -31,6 +34,7 @@ class StorageService {
     await Hive.openBox(workoutSessionBoxName);
     await Hive.openBox(wellbeingBoxName);
     await Hive.openBox(puzzleProgressBoxName);
+    await Hive.openBox(settingsBoxName);
   }
 
   static Future<void> closeForTesting() async {
@@ -41,6 +45,7 @@ class StorageService {
   static Box get _sessionBox => Hive.box(workoutSessionBoxName);
   static Box get _wellbeingBox => Hive.box(wellbeingBoxName);
   static Box get _puzzleBox => Hive.box(puzzleProgressBoxName);
+  static Box get _settingsBox => Hive.box(settingsBoxName);
 
   static Future<String> saveWorkoutSet(WorkoutSet workoutSet) async {
     final id = DateTime.now().microsecondsSinceEpoch.toString();
@@ -205,5 +210,45 @@ class StorageService {
 
   static Future<void> savePuzzleProgress(PuzzleProgress progress) async {
     await _puzzleBox.put('progress', progress.toMap());
+  }
+
+  // --- App settings ---
+
+  static AppSettings getAppSettings() {
+    final raw = _settingsBox.get('settings');
+    if (raw is Map) {
+      return AppSettings.fromMap(raw);
+    }
+    return const AppSettings();
+  }
+
+  static Future<void> saveAppSettings(AppSettings settings) async {
+    await _settingsBox.put('settings', settings.toMap());
+  }
+
+  /// Used by import to restore sets with original ids.
+  static Future<void> putWorkoutSetRaw(
+    String id,
+    Map<String, dynamic> map,
+  ) async {
+    await _box.put(id, map);
+  }
+
+  static Future<void> putWorkoutSessionRaw(
+    String id,
+    Map<String, dynamic> map,
+  ) async {
+    await _sessionBox.put(id, map);
+  }
+
+  /// Clears Bloom user data. Optionally keeps theme / notification prefs.
+  static Future<void> clearAllUserData({bool keepSettings = true}) async {
+    await _box.clear();
+    await _sessionBox.clear();
+    await _wellbeingBox.clear();
+    await _puzzleBox.clear();
+    if (!keepSettings) {
+      await _settingsBox.clear();
+    }
   }
 }
