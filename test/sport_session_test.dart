@@ -146,6 +146,14 @@ void main() {
     );
   });
 
+  test('liste vide de exerciseIds produit un plan vide', () async {
+    final plan = await WorkoutSessionPlanService.generateNextSession(
+      exerciseIds: const [],
+    );
+
+    expect(plan.exercises, isEmpty);
+  });
+
   test('historique Hive liste les séances', () async {
     await WorkoutSessionService.startSession();
     await WorkoutSessionService.addSet(

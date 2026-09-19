@@ -6,14 +6,14 @@ import 'progression_service.dart';
 class WorkoutSessionPlanService {
   /// Builds a session plan for [exerciseIds] (order preserved).
   ///
-  /// When [exerciseIds] is null or empty, falls back to the full catalogue
-  /// so existing callers keep working.
+  /// When [exerciseIds] is `null`, uses the full catalogue (legacy callers).
+  /// When [exerciseIds] is an empty list, returns an empty plan so the UI can
+  /// require an explicit selection.
   static Future<WorkoutSessionPlan> generateNextSession({
     List<String>? exerciseIds,
   }) async {
-    final selectedIds = (exerciseIds == null || exerciseIds.isEmpty)
-        ? ExerciseService.getAll().map((exercise) => exercise.id).toList()
-        : List<String>.from(exerciseIds);
+    final selectedIds = exerciseIds ??
+        ExerciseService.getAll().map((exercise) => exercise.id).toList();
 
     final plans = <WorkoutPlan>[];
 
@@ -24,11 +24,13 @@ class WorkoutSessionPlanService {
       plans.add(plan);
     }
 
-    final reason = selectedIds.length == ExerciseService.getAll().length
-        ? 'Une séance adaptée à ta progression.'
-        : 'Séance avec ${selectedIds.length} exercice'
-            '${selectedIds.length > 1 ? 's' : ''} sélectionné'
-            '${selectedIds.length > 1 ? 's' : ''}.';
+    final reason = selectedIds.isEmpty
+        ? 'Sélectionne au moins un exercice.'
+        : selectedIds.length == ExerciseService.getAll().length
+            ? 'Une séance adaptée à ta progression.'
+            : 'Séance avec ${selectedIds.length} exercice'
+                '${selectedIds.length > 1 ? 's' : ''} sélectionné'
+                '${selectedIds.length > 1 ? 's' : ''}.';
 
     return WorkoutSessionPlan(
       name: 'Ma prochaine séance',
