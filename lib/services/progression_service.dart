@@ -23,16 +23,13 @@ class ProgressionService {
     final averageRepetitions =
         lastSets.fold<double>(
               0,
-              (total, set) =>
-                  total +
-                  ((set['repetitions'] ?? 0) as num).toDouble(),
+              (total, set) => total + set.repetitions.toDouble(),
             ) /
             lastSets.length;
 
     final assistanceValues = lastSets
-        .map((set) => set['assistance'])
-        .where((value) => value != null)
-        .map((value) => (value as num).toDouble())
+        .map((set) => set.assistance)
+        .whereType<double>()
         .toList();
 
     if (assistanceValues.isNotEmpty) {
@@ -63,9 +60,8 @@ class ProgressionService {
     }
 
     final weightValues = lastSets
-        .map((set) => set['weight'])
-        .where((value) => value != null)
-        .map((value) => (value as num).toDouble())
+        .map((set) => set.weight)
+        .whereType<double>()
         .toList();
 
     if (weightValues.isNotEmpty) {
@@ -87,8 +83,7 @@ class ProgressionService {
         sets: 4,
         repetitions: 8,
         weight: weight,
-        reason:
-            'On consolide la charge actuelle.',
+        reason: 'On consolide la charge actuelle.',
       );
     }
 
@@ -96,8 +91,7 @@ class ProgressionService {
       exerciseId: exerciseId,
       sets: 3,
       repetitions: 8,
-      reason:
-          'On augmente progressivement le nombre de répétitions.',
+      reason: 'On augmente progressivement le nombre de répétitions.',
     );
   }
 }

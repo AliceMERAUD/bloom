@@ -1,27 +1,22 @@
 import 'package:flutter/material.dart';
 
+import '../../models/workout_set.dart';
 import '../../services/exercise_service.dart';
 import '../../services/storage_service.dart';
 
 class HistoryScreen extends StatelessWidget {
   const HistoryScreen({super.key});
 
-  String formatDate(String? value) {
+  String formatDate(DateTime? value) {
     if (value == null) {
       return '';
     }
 
-    final date = DateTime.tryParse(value);
-
-    if (date == null) {
-      return '';
-    }
-
-    return '${date.day.toString().padLeft(2, '0')}/'
-        '${date.month.toString().padLeft(2, '0')}/'
-        '${date.year} à '
-        '${date.hour.toString().padLeft(2, '0')}:'
-        '${date.minute.toString().padLeft(2, '0')}';
+    return '${value.day.toString().padLeft(2, '0')}/'
+        '${value.month.toString().padLeft(2, '0')}/'
+        '${value.year} à '
+        '${value.hour.toString().padLeft(2, '0')}:'
+        '${value.minute.toString().padLeft(2, '0')}';
   }
 
   @override
@@ -44,31 +39,24 @@ class HistoryScreen extends StatelessWidget {
               padding: const EdgeInsets.all(16),
               itemCount: sets.length,
               itemBuilder: (context, index) {
-                final set = sets[index];
-
-                final exerciseId = set['exerciseId'] as String?;
-                final repetitions = set['repetitions'];
-                final weight = set['weight'];
-                final assistance = set['assistance'];
-                final duration = set['durationSeconds'];
-                final date = set['date'] as String?;
+                final WorkoutSet set = sets[index];
 
                 final exercise = ExerciseService.getAll().firstWhere(
-                  (exercise) => exercise.id == exerciseId,
+                  (exercise) => exercise.id == set.exerciseId,
                   orElse: () => ExerciseService.getAll().first,
                 );
 
-                String details = '$repetitions répétitions';
+                String details = '${set.repetitions} répétitions';
 
-                if (assistance != null) {
-                  details += ' • Assistance : $assistance kg';
+                if (set.assistance != null) {
+                  details += ' • Assistance : ${set.assistance} kg';
                 }
-                if (weight != null) {
-                details += ' • Charge : $weight kg';
+                if (set.weight != null) {
+                  details += ' • Charge : ${set.weight} kg';
                 }
 
-                if (duration != null) {
-                details += ' • $duration secondes';
+                if (set.durationSeconds != null) {
+                  details += ' • ${set.durationSeconds} secondes';
                 }
 
                 return Card(
@@ -84,7 +72,7 @@ class HistoryScreen extends StatelessWidget {
                       ),
                     ),
                     subtitle: Text(
-                      '$details\n${formatDate(date)}',
+                      '$details\n${formatDate(set.date)}',
                     ),
                     isThreeLine: true,
                   ),

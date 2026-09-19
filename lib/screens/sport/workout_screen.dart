@@ -150,11 +150,13 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
           ),
           actions: [
             FilledButton(
-              onPressed: () {
-                WorkoutSessionService.endSession();
+              onPressed: () async {
+                await WorkoutSessionService.endSession();
 
+                if (!dialogContext.mounted) return;
                 Navigator.of(dialogContext).pop();
 
+                if (!mounted) return;
                 Navigator.of(context).pop();
               },
               child: const Text('Terminer'),
