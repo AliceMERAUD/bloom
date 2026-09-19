@@ -3,17 +3,20 @@ import 'package:hive_flutter/hive_flutter.dart';
 import '../models/wellbeing_entry.dart';
 import '../models/workout_session.dart';
 import '../models/workout_set.dart';
+import 'puzzle_progress_service.dart';
 
 class StorageService {
   static const String workoutBoxName = 'workout_sets';
   static const String workoutSessionBoxName = 'workout_sessions';
   static const String wellbeingBoxName = 'wellbeing_entries';
+  static const String puzzleProgressBoxName = 'puzzle_progress';
 
   static Future<void> init() async {
     await Hive.initFlutter();
     await Hive.openBox(workoutBoxName);
     await Hive.openBox(workoutSessionBoxName);
     await Hive.openBox(wellbeingBoxName);
+    await Hive.openBox(puzzleProgressBoxName);
   }
 
   /// Initialise Hive avec un chemin local (tests unitaires).
@@ -27,6 +30,7 @@ class StorageService {
     await Hive.openBox(workoutBoxName);
     await Hive.openBox(workoutSessionBoxName);
     await Hive.openBox(wellbeingBoxName);
+    await Hive.openBox(puzzleProgressBoxName);
   }
 
   static Future<void> closeForTesting() async {
@@ -36,6 +40,7 @@ class StorageService {
   static Box get _box => Hive.box(workoutBoxName);
   static Box get _sessionBox => Hive.box(workoutSessionBoxName);
   static Box get _wellbeingBox => Hive.box(wellbeingBoxName);
+  static Box get _puzzleBox => Hive.box(puzzleProgressBoxName);
 
   static Future<String> saveWorkoutSet(WorkoutSet workoutSet) async {
     final id = DateTime.now().microsecondsSinceEpoch.toString();
@@ -188,5 +193,17 @@ class StorageService {
 
   static Future<void> deleteWellbeingEntry(String id) async {
     await _wellbeingBox.delete(id);
+  }
+
+  // --- Puzzle progress ---
+
+  static PuzzleProgress? getPuzzleProgress() {
+    final raw = _puzzleBox.get('progress');
+    if (raw == null) return null;
+    return PuzzleProgress.fromMap(raw as Map);
+  }
+
+  static Future<void> savePuzzleProgress(PuzzleProgress progress) async {
+    await _puzzleBox.put('progress', progress.toMap());
   }
 }
