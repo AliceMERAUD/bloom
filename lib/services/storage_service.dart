@@ -1,16 +1,19 @@
 import 'package:hive_flutter/hive_flutter.dart';
 
+import '../models/wellbeing_entry.dart';
 import '../models/workout_session.dart';
 import '../models/workout_set.dart';
 
 class StorageService {
   static const String workoutBoxName = 'workout_sets';
   static const String workoutSessionBoxName = 'workout_sessions';
+  static const String wellbeingBoxName = 'wellbeing_entries';
 
   static Future<void> init() async {
     await Hive.initFlutter();
     await Hive.openBox(workoutBoxName);
     await Hive.openBox(workoutSessionBoxName);
+    await Hive.openBox(wellbeingBoxName);
   }
 
   /// Initialise Hive avec un chemin local (tests unitaires).
@@ -23,6 +26,7 @@ class StorageService {
     Hive.init(path);
     await Hive.openBox(workoutBoxName);
     await Hive.openBox(workoutSessionBoxName);
+    await Hive.openBox(wellbeingBoxName);
   }
 
   static Future<void> closeForTesting() async {
@@ -31,6 +35,7 @@ class StorageService {
 
   static Box get _box => Hive.box(workoutBoxName);
   static Box get _sessionBox => Hive.box(workoutSessionBoxName);
+  static Box get _wellbeingBox => Hive.box(wellbeingBoxName);
 
   static Future<String> saveWorkoutSet(WorkoutSet workoutSet) async {
     final id = DateTime.now().microsecondsSinceEpoch.toString();
@@ -145,5 +150,43 @@ class StorageService {
         .where((set) => set != null)
         .map((set) => WorkoutSet.fromMap(set as Map))
         .toList();
+  }
+
+  // --- Wellbeing ---
+
+  static Future<WellbeingEntry> saveWellbeingEntry(
+    WellbeingEntry entry,
+  ) async {
+    final normalized = entry.copyWith(
+      date: WellbeingEntry.normalizeDate(entry.date),
+    );
+    final id = WellbeingEntry.dateKey(normalized.date);
+    final toStore = normalized.copyWith(id: id);
+
+    await _wellbeingBox.put(id, toStore.toMap());
+    return toStore;
+  }
+
+  static WellbeingEntry? getWellbeingEntry(String id) {
+    final raw = _wellbeingBox.get(id);
+    if (raw == null) return null;
+    return WellbeingEntry.fromMap(raw as Map);
+  }
+
+  static WellbeingEntry? getWellbeingEntryForDate(DateTime date) {
+    return getWellbeingEntry(WellbeingEntry.dateKey(date));
+  }
+
+  static List<WellbeingEntry> getAllWellbeingEntries() {
+    final entries = _wellbeingBox.values
+        .map((value) => WellbeingEntry.fromMap(value as Map))
+        .toList();
+
+    entries.sort((a, b) => b.date.compareTo(a.date));
+    return entries;
+  }
+
+  static Future<void> deleteWellbeingEntry(String id) async {
+    await _wellbeingBox.delete(id);
   }
 }
