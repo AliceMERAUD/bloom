@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 
 import '../../models/exercise.dart';
+import '../../models/exercise_fields.dart';
 import '../../models/workout_plan.dart';
 import '../../models/workout_set.dart';
-import '../../services/workout_session_service.dart';
 import '../../services/exercise_service.dart';
+import '../../services/workout_session_service.dart';
+import 'workout_summary_screen.dart';
 
 class WorkoutScreen extends StatefulWidget {
   final List<WorkoutPlan> plans;
@@ -61,28 +63,17 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
   Future<void> _validateSet() async {
     if (saving) return;
 
-    final repetitions = int.tryParse(
+    final fields = ExerciseFields.forType(_findExercise().type);
+    final repetitions = ExerciseFields.parseInt(
       repetitionsController.text,
     );
 
-    if (repetitions == null || repetitions < 0) {
+    if (repetitions == null || repetitions <= 0) {
       _showMessage(
         'Entre un nombre de répétitions valide.',
       );
       return;
     }
-
-    final weight = double.tryParse(
-      weightController.text.replaceAll(',', '.'),
-    );
-
-    final assistance = double.tryParse(
-      assistanceController.text.replaceAll(',', '.'),
-    );
-
-    final duration = int.tryParse(
-      durationController.text,
-    );
 
     setState(() {
       saving = true;
@@ -91,9 +82,15 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
     final workoutSet = WorkoutSet(
       exerciseId: plan.exerciseId,
       repetitions: repetitions,
-      weight: weight,
-      assistance: assistance,
-      durationSeconds: duration,
+      weight: fields.showWeight
+          ? ExerciseFields.parseDecimal(weightController.text)
+          : null,
+      assistance: fields.showAssistance
+          ? ExerciseFields.parseDecimal(assistanceController.text)
+          : null,
+      durationSeconds: fields.showDuration
+          ? ExerciseFields.parseInt(durationController.text)
+          : null,
     );
 
     await WorkoutSessionService.addSet(workoutSet);
@@ -109,7 +106,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
         saving = false;
       });
 
-      _showFinishedDialog();
+      await _finishSession();
       return;
     }
 
@@ -135,35 +132,24 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
     _loadPlanValues();
   }
 
-  void _showFinishedDialog() {
-    showDialog<void>(
-      context: context,
-      barrierDismissible: false,
-      builder: (dialogContext) {
-        return AlertDialog(
-          title: const Text(
-            'Séance terminée 🎉',
-          ),
-          content: Text(
-            '${widget.plans.length} exercices terminés.\n\n'
-            'Toutes tes performances ont été enregistrées.',
-          ),
-          actions: [
-            FilledButton(
-              onPressed: () async {
-                await WorkoutSessionService.endSession();
+  Future<void> _finishSession() async {
+    final sessionId = WorkoutSessionService.currentSessionId;
 
-                if (!dialogContext.mounted) return;
-                Navigator.of(dialogContext).pop();
+    await WorkoutSessionService.endSession();
 
-                if (!mounted) return;
-                Navigator.of(context).pop();
-              },
-              child: const Text('Terminer'),
-            ),
-          ],
-        );
-      },
+    if (!mounted) return;
+
+    if (sessionId == null) {
+      Navigator.of(context).pop();
+      return;
+    }
+
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(
+        builder: (_) => WorkoutSummaryScreen(
+          sessionId: sessionId,
+        ),
+      ),
     );
   }
 
@@ -324,44 +310,39 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
 
   Widget _buildInputs() {
     final exercise = _findExercise();
+    final fields = ExerciseFields.forType(exercise.type);
 
     return Column(
       children: [
-        _buildInput(
-          controller: repetitionsController,
-          label: 'Répétitions réalisées',
-          icon: Icons.repeat,
-          keyboardType: TextInputType.number,
-        ),
-
-        if (exercise.type == ExerciseType.assisted)
+        if (fields.showRepetitions)
+          _buildInput(
+            controller: repetitionsController,
+            label: 'Répétitions réalisées',
+            icon: Icons.repeat,
+            keyboardType: TextInputType.number,
+          ),
+        if (fields.showAssistance)
           _buildInput(
             controller: assistanceController,
-            label: 'Assistance utilisée (kg)',
+            label: fields.assistanceLabel,
             icon: Icons.trending_down,
-            keyboardType:
-                const TextInputType.numberWithOptions(
+            keyboardType: const TextInputType.numberWithOptions(
               decimal: true,
             ),
           ),
-
-        if (exercise.type == ExerciseType.weighted ||
-            exercise.type == ExerciseType.machine)
+        if (fields.showWeight)
           _buildInput(
             controller: weightController,
-            label: 'Charge utilisée (kg)',
+            label: fields.weightLabel,
             icon: Icons.fitness_center,
-            keyboardType:
-                const TextInputType.numberWithOptions(
+            keyboardType: const TextInputType.numberWithOptions(
               decimal: true,
             ),
           ),
-
-        if (exercise.type == ExerciseType.negative ||
-            exercise.type == ExerciseType.isometric)
+        if (fields.showDuration)
           _buildInput(
             controller: durationController,
-            label: 'Durée réalisée (secondes)',
+            label: fields.durationLabel,
             icon: Icons.timer,
             keyboardType: TextInputType.number,
           ),

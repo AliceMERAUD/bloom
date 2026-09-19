@@ -13,6 +13,14 @@ class WorkoutSession {
 
   bool get isOpen => endedAt == null;
 
+  /// Duration of a closed session; null while the session is still open.
+  Duration? get duration {
+    if (endedAt == null) {
+      return null;
+    }
+    return endedAt!.difference(startedAt);
+  }
+
   Map<String, dynamic> toMap() {
     return {
       'id': id,

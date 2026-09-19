@@ -1,25 +1,39 @@
+import '../models/workout_plan.dart';
 import '../models/workout_session_plan.dart';
-import '../services/exercise_service.dart';
-import '../services/progression_service.dart';
+import 'exercise_service.dart';
+import 'progression_service.dart';
 
 class WorkoutSessionPlanService {
-  static Future<WorkoutSessionPlan> generateNextSession() async {
-    final exercises = ExerciseService.getAll();
+  /// Builds a session plan for [exerciseIds] (order preserved).
+  ///
+  /// When [exerciseIds] is null or empty, falls back to the full catalogue
+  /// so existing callers keep working.
+  static Future<WorkoutSessionPlan> generateNextSession({
+    List<String>? exerciseIds,
+  }) async {
+    final selectedIds = (exerciseIds == null || exerciseIds.isEmpty)
+        ? ExerciseService.getAll().map((exercise) => exercise.id).toList()
+        : List<String>.from(exerciseIds);
 
-    final plans = <dynamic>[];
+    final plans = <WorkoutPlan>[];
 
-    for (final exercise in exercises) {
+    for (final exerciseId in selectedIds) {
       final plan = await ProgressionService.generateNextWorkout(
-        exercise.id,
+        exerciseId,
       );
-
       plans.add(plan);
     }
 
+    final reason = selectedIds.length == ExerciseService.getAll().length
+        ? 'Une séance adaptée à ta progression.'
+        : 'Séance avec ${selectedIds.length} exercice'
+            '${selectedIds.length > 1 ? 's' : ''} sélectionné'
+            '${selectedIds.length > 1 ? 's' : ''}.';
+
     return WorkoutSessionPlan(
       name: 'Ma prochaine séance',
-      reason: 'Une séance adaptée à ta progression.',
-      exercises: plans.cast(),
+      reason: reason,
+      exercises: plans,
     );
   }
 }
