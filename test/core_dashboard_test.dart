@@ -43,11 +43,12 @@ void main() {
     expect(find.text('Accueil'), findsOneWidget);
     expect(find.text('Sport'), findsWidgets);
     expect(find.text('Bien-être'), findsWidgets);
+    expect(find.text('Tasks'), findsWidgets);
     expect(find.text('Puzzle'), findsWidgets);
     expect(find.text('Bonjour'), findsOneWidget);
   });
 
-  testWidgets('navigation bas vers Sport / Bien-être / Puzzle', (tester) async {
+  testWidgets('navigation bas vers Sport / Bien-être / Tasks / Puzzle', (tester) async {
     await tester.pumpWidget(const BloomApp());
     await tester.pump();
 
@@ -56,6 +57,9 @@ void main() {
     expect(find.byType(MainShell), findsOneWidget);
 
     await tester.tap(find.text('Bien-être').last);
+    await tester.pump();
+
+    await tester.tap(find.text('Tasks').last);
     await tester.pump();
 
     await tester.tap(find.text('Puzzle').last);
@@ -73,6 +77,8 @@ void main() {
     expect(snap.todayEntry, isNull);
     expect(snap.puzzleCompleted, 0);
     expect(snap.hasSportHistory, isFalse);
+    expect(snap.pendingTaskCount, 0);
+    expect(snap.completedTasksToday, 0);
   });
 
   test('Dashboard reflète Sport, Wellbeing et Puzzle réels', () async {

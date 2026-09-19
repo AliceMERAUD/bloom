@@ -1,12 +1,15 @@
 import 'dart:convert';
 
 import '../models/app_settings.dart';
+import '../models/task.dart';
 import '../models/wellbeing_entry.dart';
 import '../models/workout_session.dart';
 import '../models/workout_set.dart';
 import 'puzzle_progress_service.dart';
+import 'reminder_service.dart';
 import 'settings_service.dart';
 import 'storage_service.dart';
+import 'task_service.dart';
 import 'workout_session_service.dart';
 
 class DataExportException implements Exception {
@@ -51,6 +54,9 @@ class DataExportService {
         'entries': wellbeing.map((e) => e.toMap()).toList(),
       },
       'puzzle': puzzle.toMap(),
+      'tasks': {
+        'items': StorageService.getAllTasks().map((t) => t.toMap()).toList(),
+      },
       'settings': settings.toMap(),
     };
   }
@@ -94,6 +100,11 @@ class DataExportService {
   static Future<void> importAndReplace(String raw) async {
     final data = parseImport(raw);
 
+    for (final task in TaskService.getTasks()) {
+      if (task.reminderId != null) {
+        await ReminderService.cancelId(task.reminderId!);
+      }
+    }
     await StorageService.clearAllUserData(keepSettings: false);
 
     final sport = Map<String, dynamic>.from(data['sport'] as Map? ?? {});
@@ -127,6 +138,15 @@ class DataExportService {
       final progress = PuzzleProgress.fromMap(data['puzzle'] as Map);
       await PuzzleProgressService.save(progress);
     }
+
+    // Backward compatible: older exports may omit `tasks`.
+    final tasks = Map<String, dynamic>.from(data['tasks'] as Map? ?? {});
+    final taskItems = List<dynamic>.from(tasks['items'] as List? ?? []);
+    for (final item in taskItems) {
+      final task = BloomTask.fromMap(item as Map);
+      await StorageService.saveTask(task);
+    }
+    await TaskService.rescheduleAllReminders(SettingsService.current);
 
     if (data['settings'] is Map) {
       final settings = AppSettings.fromMap(data['settings'] as Map);

@@ -9,6 +9,7 @@ import '../../widgets/common/bloom_widgets.dart';
 class HomeScreen extends StatefulWidget {
   final VoidCallback? onOpenSport;
   final VoidCallback? onOpenWellbeing;
+  final VoidCallback? onOpenTasks;
   final VoidCallback? onOpenPuzzle;
   final VoidCallback? onOpenSettings;
 
@@ -16,6 +17,7 @@ class HomeScreen extends StatefulWidget {
     super.key,
     this.onOpenSport,
     this.onOpenWellbeing,
+    this.onOpenTasks,
     this.onOpenPuzzle,
     this.onOpenSettings,
   });
@@ -94,6 +96,14 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               const SizedBox(height: 20),
               BloomSection(
+                title: 'Tasks',
+                child: _TasksCard(
+                  data: data,
+                  onOpen: widget.onOpenTasks,
+                ),
+              ),
+              const SizedBox(height: 20),
+              BloomSection(
                 title: 'Puzzle',
                 child: _PuzzleCard(
                   data: data,
@@ -116,6 +126,11 @@ class _HomeScreenState extends State<HomeScreen> {
                       onPressed: widget.onOpenWellbeing,
                       icon: const Icon(Icons.favorite, size: 18),
                       label: const Text('Humeur'),
+                    ),
+                    FilledButton.tonalIcon(
+                      onPressed: widget.onOpenTasks,
+                      icon: const Icon(Icons.checklist, size: 18),
+                      label: const Text('Tasks'),
                     ),
                     FilledButton.tonalIcon(
                       onPressed: widget.onOpenPuzzle,
@@ -147,6 +162,12 @@ class _HomeScreenState extends State<HomeScreen> {
                       icon: Icons.calendar_today,
                       label: 'Jours bien-être',
                       value: '${data.wellbeingDayCount}',
+                    ),
+                    const SizedBox(height: 8),
+                    BloomStatChip(
+                      icon: Icons.checklist,
+                      label: 'Tâches à faire',
+                      value: '${data.pendingTaskCount}',
                     ),
                     const SizedBox(height: 8),
                     BloomStatChip(
@@ -277,6 +298,76 @@ class _WellbeingCard extends StatelessWidget {
               style: Theme.of(context).textTheme.bodySmall,
             ),
           ],
+        ],
+      ),
+    );
+  }
+}
+
+class _TasksCard extends StatelessWidget {
+  final DashboardSnapshot data;
+  final VoidCallback? onOpen;
+
+  const _TasksCard({required this.data, this.onOpen});
+
+  @override
+  Widget build(BuildContext context) {
+    if (data.pendingTaskCount == 0 && data.completedTasksToday == 0) {
+      return BloomEmptyState(
+        icon: Icons.checklist,
+        message: 'Aucune tâche pour le moment',
+        actionLabel: 'Voir mes tâches',
+        onAction: onOpen,
+      );
+    }
+
+    if (data.pendingTaskCount == 0) {
+      return BloomCard(
+        onTap: onOpen,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '✨ ${data.completedTasksToday} terminée(s) aujourd’hui',
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 6),
+            const Text('Bravo, tout est fait !'),
+            const SizedBox(height: 8),
+            TextButton(
+              onPressed: onOpen,
+              child: const Text('Voir mes tâches'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return BloomCard(
+      onTap: onOpen,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'À faire aujourd’hui',
+            style: const TextStyle(fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 6),
+          Text('${data.pendingTaskCount} tâche(s) restante(s)'),
+          if (data.topPendingTaskTitles.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            ...data.topPendingTaskTitles.map(
+              (title) => Padding(
+                padding: const EdgeInsets.only(bottom: 2),
+                child: Text('· $title'),
+              ),
+            ),
+          ],
+          const SizedBox(height: 8),
+          TextButton(
+            onPressed: onOpen,
+            child: const Text('Voir mes tâches'),
+          ),
         ],
       ),
     );

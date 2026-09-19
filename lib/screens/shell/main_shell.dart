@@ -4,9 +4,10 @@ import '../home/home_screen.dart';
 import '../puzzle/puzzle_screen.dart';
 import '../settings/settings_screen.dart';
 import '../sport/sport_screen.dart';
+import '../tasks/tasks_screen.dart';
 import '../wellbeing/wellbeing_screen.dart';
 
-/// Root shell: bottom navigation for Home / Sport / Wellbeing / Puzzle.
+/// Root shell: Home / Sport / Wellbeing / Tasks / Puzzle.
 class MainShell extends StatefulWidget {
   final int initialIndex;
 
@@ -26,7 +27,7 @@ class MainShellState extends State<MainShell> {
   }
 
   void goToTab(int index) {
-    setState(() => _index = index.clamp(0, 3));
+    setState(() => _index = index.clamp(0, 4));
   }
 
   @override
@@ -38,7 +39,8 @@ class MainShellState extends State<MainShell> {
           HomeScreen(
             onOpenSport: () => goToTab(1),
             onOpenWellbeing: () => goToTab(2),
-            onOpenPuzzle: () => goToTab(3),
+            onOpenTasks: () => goToTab(3),
+            onOpenPuzzle: () => goToTab(4),
             onOpenSettings: () {
               Navigator.of(context).push(
                 MaterialPageRoute(builder: (_) => const SettingsScreen()),
@@ -47,6 +49,7 @@ class MainShellState extends State<MainShell> {
           ),
           const SportScreen(),
           const WellbeingScreen(),
+          const TasksScreen(),
           const PuzzleScreen(),
         ],
       ),
@@ -68,6 +71,11 @@ class MainShellState extends State<MainShell> {
             icon: Icon(Icons.favorite_outline),
             selectedIcon: Icon(Icons.favorite),
             label: 'Bien-être',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.checklist_outlined),
+            selectedIcon: Icon(Icons.checklist),
+            label: 'Tasks',
           ),
           NavigationDestination(
             icon: Icon(Icons.extension_outlined),
