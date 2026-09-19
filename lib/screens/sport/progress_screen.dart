@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../models/workout_set.dart';
 import '../../services/exercise_service.dart';
 import '../../services/storage_service.dart';
 
@@ -18,7 +19,7 @@ class ProgressScreen extends StatefulWidget {
 class _ProgressScreenState extends State<ProgressScreen> {
   bool loading = true;
 
-  List<Map<String, dynamic>> sets = [];
+  List<WorkoutSet> sets = [];
 
   @override
   void initState() {
@@ -27,8 +28,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
   }
 
   Future<void> _loadProgress() async {
-    final result =
-        await StorageService.getSetsForExercise(
+    final result = await StorageService.getSetsForExercise(
       widget.exerciseId,
     );
 
@@ -56,18 +56,14 @@ class _ProgressScreenState extends State<ProgressScreen> {
     if (sets.isEmpty) return 0;
 
     return sets
-        .map(
-          (set) => (set['repetitions'] ?? 0) as num,
-        )
-        .map((value) => value.toInt())
+        .map((set) => set.repetitions)
         .reduce((a, b) => a > b ? a : b);
   }
 
   double? _maxWeight() {
     final weights = sets
-        .map((set) => set['weight'])
-        .where((value) => value != null)
-        .map((value) => (value as num).toDouble())
+        .map((set) => set.weight)
+        .whereType<double>()
         .toList();
 
     if (weights.isEmpty) return null;
@@ -77,9 +73,8 @@ class _ProgressScreenState extends State<ProgressScreen> {
 
   double? _bestAssistance() {
     final assistance = sets
-        .map((set) => set['assistance'])
-        .where((value) => value != null)
-        .map((value) => (value as num).toDouble())
+        .map((set) => set.assistance)
+        .whereType<double>()
         .toList();
 
     if (assistance.isEmpty) return null;
@@ -91,9 +86,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
   int _totalRepetitions() {
     return sets.fold(
       0,
-      (total, set) =>
-          total +
-          ((set['repetitions'] ?? 0) as num).toInt(),
+      (total, set) => total + set.repetitions,
     );
   }
 
@@ -101,18 +94,13 @@ class _ProgressScreenState extends State<ProgressScreen> {
     return sets.fold(
       0.0,
       (total, set) {
-        final weight = set['weight'];
+        final weight = set.weight;
 
         if (weight == null) {
           return total;
         }
 
-        final repetitions =
-            ((set['repetitions'] ?? 0) as num).toDouble();
-
-        return total +
-            (weight as num).toDouble() *
-                repetitions;
+        return total + weight * set.repetitions.toDouble();
       },
     );
   }
@@ -124,18 +112,12 @@ class _ProgressScreenState extends State<ProgressScreen> {
 
     final lastSet = sets.last;
 
-    final repetitions =
-        ((lastSet['repetitions'] ?? 0) as num).toInt();
-
-    final assistance = lastSet['assistance'];
+    final repetitions = lastSet.repetitions;
+    final assistance = lastSet.assistance;
 
     if (assistance != null) {
-      final assistanceValue =
-          (assistance as num).toDouble();
-
       if (repetitions >= 8) {
-        final nextAssistance =
-            (assistanceValue - 2.5).clamp(0, 999);
+        final nextAssistance = (assistance - 2.5).clamp(0, 999);
 
         return 'Objectif : $repetitions reps avec '
             '${nextAssistance.toStringAsFixed(1)} kg '
@@ -143,7 +125,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
       }
 
       return 'Objectif : atteindre 8 répétitions '
-          'avec ${assistanceValue.toStringAsFixed(1)} kg '
+          'avec ${assistance.toStringAsFixed(1)} kg '
           'd’assistance.';
     }
 
@@ -206,11 +188,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
 
                       const SizedBox(height: 12),
 
-                      ...sets.reversed
-                          .toList()
-                          .asMap()
-                          .entries
-                          .map(
+                      ...sets.reversed.toList().asMap().entries.map(
                         (entry) {
                           final set = entry.value;
 
@@ -231,8 +209,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
       child: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
-          crossAxisAlignment:
-              CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Row(
               children: [
@@ -266,47 +243,47 @@ class _ProgressScreenState extends State<ProgressScreen> {
     final totalVolume = _totalVolume();
 
     return GridView.count(
-        crossAxisCount: 2,
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        crossAxisSpacing: 12,
-        mainAxisSpacing: 12,
-        childAspectRatio: 1.45,
-        children: [
+      crossAxisCount: 2,
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      crossAxisSpacing: 12,
+      mainAxisSpacing: 12,
+      childAspectRatio: 1.45,
+      children: [
         _statCard(
-            'Meilleur',
-            '${_maxRepetitions()} reps',
-            Icons.repeat,
+          'Meilleur',
+          '${_maxRepetitions()} reps',
+          Icons.repeat,
         ),
         _statCard(
-            'Total',
-            '${_totalRepetitions()} reps',
-            Icons.numbers,
+          'Total',
+          '${_totalRepetitions()} reps',
+          Icons.numbers,
         ),
         _statCard(
-            'Charge max',
-            maxWeight == null
-                ? '-'
-                : '${maxWeight.toStringAsFixed(1)} kg',
-            Icons.fitness_center,
+          'Charge max',
+          maxWeight == null
+              ? '-'
+              : '${maxWeight.toStringAsFixed(1)} kg',
+          Icons.fitness_center,
         ),
         _statCard(
-            'Meilleure assistance',
-            bestAssistance == null
-                ? '-'
-                : '${bestAssistance.toStringAsFixed(1)} kg',
-            Icons.trending_down,
+          'Meilleure assistance',
+          bestAssistance == null
+              ? '-'
+              : '${bestAssistance.toStringAsFixed(1)} kg',
+          Icons.trending_down,
         ),
         _statCard(
-            'Volume total',
-            totalVolume == 0
-                ? '-'
-                : '${totalVolume.toStringAsFixed(0)} kg',
-            Icons.bar_chart,
+          'Volume total',
+          totalVolume == 0
+              ? '-'
+              : '${totalVolume.toStringAsFixed(0)} kg',
+          Icons.bar_chart,
         ),
-        ],
+      ],
     );
-    }
+  }
 
   Widget _statCard(
     String title,
@@ -317,8 +294,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
       child: Padding(
         padding: const EdgeInsets.all(14),
         child: Column(
-          crossAxisAlignment:
-              CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Icon(icon),
             const Spacer(),
@@ -337,26 +313,17 @@ class _ProgressScreenState extends State<ProgressScreen> {
   }
 
   Widget _buildSetCard(
-    Map<String, dynamic> set,
+    WorkoutSet set,
     int number,
   ) {
-    final repetitions =
-        set['repetitions'] ?? 0;
+    String subtitle = '${set.repetitions} répétitions';
 
-    final weight = set['weight'];
-    final assistance = set['assistance'];
-
-    String subtitle =
-        '$repetitions répétitions';
-
-    if (assistance != null) {
-      subtitle +=
-          ' • Assistance : $assistance kg';
+    if (set.assistance != null) {
+      subtitle += ' • Assistance : ${set.assistance} kg';
     }
 
-    if (weight != null) {
-      subtitle +=
-          ' • Charge : $weight kg';
+    if (set.weight != null) {
+      subtitle += ' • Charge : ${set.weight} kg';
     }
 
     return Card(

@@ -24,8 +24,5 @@ dev_dependencies:
 flutter:
   uses-material-design: true
 
-  assets:
-    - assets/characters/
-    - assets/tiles/
-    - assets/furniture/
-    - assets/backgrounds/
+  # Assets (characters, tiles, furniture, backgrounds) seront
+  # déclarés ici lorsqu'ils seront réellement ajoutés au projet.

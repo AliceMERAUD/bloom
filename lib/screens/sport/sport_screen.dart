@@ -62,7 +62,7 @@ class SportScreen extends StatelessWidget {
                 return;
               }
 
-              WorkoutSessionService.endSession();
+              await WorkoutSessionService.endSession();
 
               if (!context.mounted) return;
 

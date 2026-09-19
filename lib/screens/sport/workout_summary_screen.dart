@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 
-import '../../services/storage_service.dart';
+import '../../models/workout_set.dart';
 import '../../services/exercise_service.dart';
+import '../../services/storage_service.dart';
 
 class WorkoutSummaryScreen extends StatefulWidget {
   final String sessionId;
@@ -16,22 +17,22 @@ class WorkoutSummaryScreen extends StatefulWidget {
       _WorkoutSummaryScreenState();
 }
 
-class _WorkoutSummaryScreenState
-    extends State<WorkoutSummaryScreen> {
-        String getExerciseName(dynamic exerciseId) {
-  final exercises = ExerciseService.getAll();
+class _WorkoutSummaryScreenState extends State<WorkoutSummaryScreen> {
+  String getExerciseName(String exerciseId) {
+    final exercises = ExerciseService.getAll();
 
-  for (final exercise in exercises) {
-    if (exercise.id == exerciseId) {
-      return exercise.name;
+    for (final exercise in exercises) {
+      if (exercise.id == exerciseId) {
+        return exercise.name;
+      }
     }
+
+    return 'Exercice';
   }
 
-  return 'Exercice';
-}
   bool loading = true;
 
-  List<Map<String, dynamic>> sets = [];
+  List<WorkoutSet> sets = [];
 
   @override
   void initState() {
@@ -64,15 +65,10 @@ class _WorkoutSummaryScreenState
 
     final totalRepetitions = sets.fold<int>(
       0,
-      (total, set) =>
-          total + ((set['repetitions'] ?? 0) as num).toInt(),
+      (total, set) => total + set.repetitions,
     );
 
-    final exercises = sets
-        .map((set) => set['exerciseId'])
-        .where((id) => id != null)
-        .toSet()
-        .length;
+    final exercises = sets.map((set) => set.exerciseId).toSet().length;
 
     return Scaffold(
       appBar: AppBar(
@@ -123,23 +119,14 @@ class _WorkoutSummaryScreenState
               final index = entry.key + 1;
               final set = entry.value;
 
-              final repetitions =
-                  set['repetitions'] ?? 0;
+              String details = '${set.repetitions} répétitions';
 
-              final weight = set['weight'];
-              final assistance = set['assistance'];
-
-              String details =
-                  '$repetitions répétitions';
-
-              if (assistance != null) {
-                details +=
-                    ' • Assistance : $assistance kg';
+              if (set.assistance != null) {
+                details += ' • Assistance : ${set.assistance} kg';
               }
 
-              if (weight != null) {
-                details +=
-                    ' • Charge : $weight kg';
+              if (set.weight != null) {
+                details += ' • Charge : ${set.weight} kg';
               }
 
               return Card(
@@ -148,8 +135,8 @@ class _WorkoutSummaryScreenState
                     child: Text('$index'),
                   ),
                   title: Text(
-                    getExerciseName(set['exerciseId']),
-                    ),
+                    getExerciseName(set.exerciseId),
+                  ),
                   subtitle: Text(details),
                 ),
               );

@@ -7,8 +7,7 @@ class WorkoutSessionService {
   static String? get currentSessionId => _currentSessionId;
 
   static Future<void> startSession() async {
-    _currentSessionId =
-        await StorageService.createWorkoutSession();
+    _currentSessionId = await StorageService.createWorkoutSession();
   }
 
   static Future<void> addSet(WorkoutSet workoutSet) async {
@@ -24,7 +23,13 @@ class WorkoutSessionService {
     );
   }
 
-  static void endSession() {
+  static Future<void> endSession() async {
+    final sessionId = _currentSessionId;
+
+    if (sessionId != null) {
+      await StorageService.endWorkoutSession(sessionId);
+    }
+
     _currentSessionId = null;
   }
 }
