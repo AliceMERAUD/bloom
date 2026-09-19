@@ -146,12 +146,13 @@ class DataExportService {
       final task = BloomTask.fromMap(item as Map);
       await StorageService.saveTask(task);
     }
-    await TaskService.rescheduleAllReminders(SettingsService.current);
 
     if (data['settings'] is Map) {
       final settings = AppSettings.fromMap(data['settings'] as Map);
       await SettingsService.save(settings);
     }
+    // After settings so global notification prefs are applied.
+    await TaskService.rescheduleAllReminders(SettingsService.current);
 
     WorkoutSessionService.resetForTesting();
     await WorkoutSessionService.restoreFromStorage();

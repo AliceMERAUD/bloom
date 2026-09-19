@@ -74,7 +74,7 @@ class _TasksScreenState extends State<TasksScreen> {
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 88),
           children: [
             Text(
-              'Les petites choses à faire',
+              'Les petites choses à faire 🌱',
               style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: 12),
