@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:bloom/models/app_settings.dart';
 import 'package:bloom/models/google_calendar.dart';
 import 'package:bloom/models/task.dart';
+import 'package:bloom/services/google_calendar/google_sign_in_config.dart';
 import 'package:bloom/services/google_calendar/fake_google_calendar_backend.dart';
 import 'package:bloom/services/google_calendar/google_calendar_service.dart';
 import 'package:bloom/services/settings_service.dart';
@@ -30,6 +31,17 @@ void main() {
     if (await tempDir.exists()) {
       await tempDir.delete(recursive: true);
     }
+  });
+
+  group('GoogleSignInConfig', () {
+    test('scopes Calendar étroits et package Android documenté', () {
+      expect(GoogleSignInConfig.androidApplicationId, 'com.example.bloom');
+      expect(GoogleSignInConfig.calendarScopes, hasLength(2));
+      expect(
+        GoogleSignInConfig.calendarScopes.any((s) => s.contains('calendar')),
+        isTrue,
+      );
+    });
   });
 
   group('GoogleCalendarService', () {

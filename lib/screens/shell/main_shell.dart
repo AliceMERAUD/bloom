@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../../app/theme.dart';
 import '../../services/bloom_refresh.dart';
 import '../../services/puzzle_progress_service.dart';
 import '../home/home_screen.dart';
@@ -13,7 +12,8 @@ import '../tasks/tasks_screen.dart';
 import '../wellbeing/wellbeing_entry_screen.dart';
 import '../wellbeing/wellbeing_screen.dart';
 
-/// Root shell: Accueil / Tasks / Sport / Bien-être / Plus.
+/// Root shell: Accueil / Tasks / Sport / Bien-être / Puzzle.
+/// Settings are opened from the Accueil AppBar (⚙️), not from the bottom bar.
 class MainShell extends StatefulWidget {
   final int initialIndex;
 
@@ -27,8 +27,7 @@ class MainShellState extends State<MainShell> {
   late int _index;
   final GlobalKey<SportScreenState> _sportKey = GlobalKey<SportScreenState>();
 
-  static const int _tabCount = 4; // Accueil, Tasks, Sport, Bien-être
-  static const int _moreIndex = 4;
+  static const int _tabCount = 5; // Accueil, Tasks, Sport, Bien-être, Puzzle
 
   @override
   void initState() {
@@ -50,51 +49,11 @@ class MainShellState extends State<MainShell> {
     await _sportKey.currentState?.startSessionFromShortcut();
   }
 
-  Future<void> _openPuzzle() async {
-    await Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const PuzzleScreen()),
-    );
-    BloomRefresh.notify();
-  }
-
   Future<void> _openSettings() async {
     await Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => const SettingsScreen()),
     );
     BloomRefresh.notify();
-  }
-
-  Future<void> _showMoreMenu() async {
-    final choice = await showModalBottomSheet<String>(
-      context: context,
-      showDragHandle: true,
-      builder: (ctx) {
-        return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                leading: Icon(Icons.extension, color: BloomTheme.puzzle),
-                title: const Text('Puzzle'),
-                onTap: () => Navigator.pop(ctx, 'puzzle'),
-              ),
-              ListTile(
-                leading: const Icon(Icons.settings_outlined),
-                title: const Text('Paramètres'),
-                onTap: () => Navigator.pop(ctx, 'settings'),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-    if (!mounted || choice == null) return;
-    switch (choice) {
-      case 'puzzle':
-        await _openPuzzle();
-      case 'settings':
-        await _openSettings();
-    }
   }
 
   @override
@@ -107,7 +66,7 @@ class MainShellState extends State<MainShell> {
             onOpenSport: () => goToTab(2),
             onOpenWellbeing: () => goToTab(3),
             onOpenTasks: () => goToTab(1),
-            onOpenPuzzle: _openPuzzle,
+            onOpenPuzzle: () => goToTab(4),
             onOpenGoogleCalendar: _openSettings,
             onOpenSettings: _openSettings,
             onAddTask: () async {
@@ -129,7 +88,7 @@ class MainShellState extends State<MainShell> {
             onContinuePuzzle: () {
               final id = PuzzleProgressService.load().nextPlayableId;
               if (id == null) {
-                _openPuzzle();
+                goToTab(4);
                 return;
               }
               Navigator.of(context)
@@ -145,17 +104,12 @@ class MainShellState extends State<MainShell> {
           const TasksScreen(),
           SportScreen(key: _sportKey),
           const WellbeingScreen(),
+          const PuzzleScreen(),
         ],
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,
-        onDestinationSelected: (i) {
-          if (i == _moreIndex) {
-            _showMoreMenu();
-            return;
-          }
-          goToTab(i);
-        },
+        onDestinationSelected: goToTab,
         destinations: const [
           NavigationDestination(
             icon: Icon(Icons.home_outlined),
@@ -178,9 +132,9 @@ class MainShellState extends State<MainShell> {
             label: 'Bien-être',
           ),
           NavigationDestination(
-            icon: Icon(Icons.more_horiz),
-            selectedIcon: Icon(Icons.more_horiz),
-            label: 'Plus',
+            icon: Icon(Icons.extension_outlined),
+            selectedIcon: Icon(Icons.extension),
+            label: 'Puzzle',
           ),
         ],
       ),

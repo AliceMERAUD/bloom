@@ -44,11 +44,13 @@ void main() {
     expect(find.text('Sport'), findsWidgets);
     expect(find.text('Bien-être'), findsWidgets);
     expect(find.text('Tasks'), findsWidgets);
-    expect(find.text('Plus'), findsOneWidget);
+    expect(find.text('Puzzle'), findsWidgets);
+    expect(find.text('Plus'), findsNothing);
     expect(find.text('Bonjour'), findsOneWidget);
+    expect(find.byTooltip('Paramètres'), findsOneWidget);
   });
 
-  testWidgets('navigation bas vers Tasks / Sport / Bien-être / Plus', (tester) async {
+  testWidgets('navigation bas vers Tasks / Sport / Bien-être / Puzzle', (tester) async {
     await tester.pumpWidget(const BloomApp());
     await tester.pump();
 
@@ -63,14 +65,9 @@ void main() {
     await tester.tap(find.text('Bien-être').last);
     await tester.pump();
 
-    await tester.tap(find.text('Plus'));
+    await tester.tap(find.text('Puzzle').last);
     await tester.pump();
-    expect(find.text('Puzzle'), findsWidgets);
-    expect(find.text('Paramètres'), findsWidgets);
-
-    // Dismiss Plus sheet.
-    Navigator.of(tester.element(find.text('Puzzle').first)).pop();
-    await tester.pump();
+    expect(find.textContaining('Puzzle'), findsWidgets);
 
     await tester.tap(find.text('Accueil'));
     await tester.pump();
@@ -78,6 +75,17 @@ void main() {
     expect(find.byTooltip('Paramètres'), findsOneWidget);
   });
 
+  testWidgets('Paramètres depuis l’accueil ouvre SettingsScreen', (tester) async {
+    await tester.pumpWidget(const BloomApp());
+    await tester.pump();
+
+    await tester.tap(find.byTooltip('Paramètres'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Paramètres'), findsWidgets);
+    expect(find.text('Google Calendar'), findsOneWidget);
+    expect(find.text('Connecter Google'), findsOneWidget);
+  });
   test('Dashboard affiche états vides sans données', () {
     final snap = DashboardService.load();
     expect(snap.closedSessionCount, 0);

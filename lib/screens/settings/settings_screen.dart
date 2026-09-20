@@ -208,14 +208,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
           content: Text(
             ok
                 ? 'Google Calendar connecté.'
-                : 'Connexion annulée ou impossible.',
+                : 'Connexion Google annulée.',
           ),
         ),
       );
     } on GoogleCalendarException catch (e) {
       if (mounted) _showGcalError(e);
     } catch (e) {
-      if (mounted) _showGcalError(e);
+      if (mounted) {
+        _showGcalError(
+          const GoogleCalendarException(
+            'Connexion Google impossible.\n'
+            'Vérifie ta connexion Internet et la configuration Google de Bloom.',
+          ),
+        );
+      }
     }
   }
 
@@ -357,7 +364,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
           BloomSection(
             title: 'Google Calendar',
             subtitle:
-                'Bloom reste utilisable hors ligne ; OAuth requis côté Google Cloud',
+                'Optionnel. Connexion Google Cloud requise '
+                '(voir docs/google_calendar_oauth.md)',
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -371,7 +379,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   title: Text(connected ? 'Connecté' : 'Non connecté'),
                   subtitle: connected
                       ? Text(gcal.accountEmail!)
-                      : const Text('Aucun compte Google lié'),
+                      : const Text(
+                          'Aucun compte Google lié. '
+                          'Bloom reste utilisable hors ligne.',
+                        ),
                 ),
                 if (connected) ...[
                   ListTile(
@@ -398,7 +409,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ] else
                   FilledButton(
                     onPressed: _connectGoogleCalendar,
-                    child: const Text('Connecter'),
+                    child: const Text('Connecter Google'),
                   ),
               ],
             ),
