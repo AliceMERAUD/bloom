@@ -1,9 +1,11 @@
+import '../models/planning_event.dart';
 import '../models/task.dart';
 import '../models/wellbeing_entry.dart';
 import '../models/wellbeing_enums.dart';
 import '../models/workout_session.dart';
 import '../models/workout_set.dart';
 import 'exercise_service.dart';
+import 'planning_service.dart';
 import 'puzzle_catalog.dart';
 import 'puzzle_progress_service.dart';
 import 'sport_activity_service.dart';
@@ -40,6 +42,8 @@ class DashboardSnapshot {
   final String? nextSportName;
   final TractionProgressSummary? tractionProgress;
   final String motivationalLine;
+  final int todayPlanningCount;
+  final List<PlanningEventPreview> upcomingPlanning;
 
   const DashboardSnapshot({
     required this.closedSessionCount,
@@ -68,6 +72,8 @@ class DashboardSnapshot {
     required this.nextSportName,
     required this.tractionProgress,
     required this.motivationalLine,
+    required this.todayPlanningCount,
+    required this.upcomingPlanning,
   });
 
   bool get hasSportHistory => closedSessionCount > 0 || openSession != null;
@@ -93,6 +99,18 @@ class TractionProgressSummary {
   });
 
   bool get hasData => latestAssistance != null;
+}
+
+class PlanningEventPreview {
+  final String title;
+  final String? timeLabel;
+  final String kindLabel;
+
+  const PlanningEventPreview({
+    required this.title,
+    required this.kindLabel,
+    this.timeLabel,
+  });
 }
 
 class DashboardService {
@@ -143,6 +161,25 @@ class DashboardService {
         )
         .length;
 
+    final todayPlanning = PlanningService.eventsForDay(DateTime.now());
+    final upcomingPlanning = PlanningService.upcoming(limit: 4)
+        .map(
+          (e) => PlanningEventPreview(
+            title: e.title,
+            kindLabel: switch (e.kind) {
+              PlanningEventKind.period => 'Règles',
+              PlanningEventKind.workoutSession => 'Séance',
+              PlanningEventKind.sportActivity => 'Sport',
+              PlanningEventKind.task => 'Tâche',
+            },
+            timeLabel: e.time == null
+                ? null
+                : '${e.time!.hour.toString().padLeft(2, '0')}:'
+                    '${e.time!.minute.toString().padLeft(2, '0')}',
+          ),
+        )
+        .toList();
+
     return DashboardSnapshot(
       closedSessionCount: closed.length,
       totalSetCount: sets.length,
@@ -178,6 +215,8 @@ class DashboardService {
         puzzleTotal: PuzzleCatalog.all.length,
         hasWellbeing: today != null,
       ),
+      todayPlanningCount: todayPlanning.length,
+      upcomingPlanning: upcomingPlanning,
     );
   }
 
