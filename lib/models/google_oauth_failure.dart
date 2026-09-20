@@ -6,13 +6,18 @@ enum GoogleOAuthFailureKind {
   /// User dismissed the account picker.
   cancelled,
 
-  /// `GOOGLE_SERVER_CLIENT_ID` (Web OAuth client) not provided at build time
-  /// and no `google-services.json` path is available.
+  /// Web OAuth client (`GOOGLE_SERVER_CLIENT_ID`) missing — often required on
+  /// Android when `google-services.json` is absent.
   serverClientIdMissing,
 
-  /// Typical ApiException:10 DEVELOPER_ERROR — package/SHA-1/Android client
-  /// or Web serverClientId mismatch in Google Cloud.
+  /// ApiException:10 — package / SHA-1 / Android OAuth client not recognized.
   oauthAndroidMisconfigured,
+
+  /// Web client ID present but rejected / mismatched project.
+  serverClientIdInvalid,
+
+  /// Calendar API disabled in the Cloud project (when detectable).
+  calendarApiDisabled,
 
   /// ApiException:7 / socket / DNS.
   network,
@@ -28,19 +33,22 @@ enum GoogleOAuthFailureKind {
 }
 
 extension GoogleOAuthFailureKindX on GoogleOAuthFailureKind {
-  /// Short label for debug diagnostics (not a secret).
   String get debugLabel {
     switch (this) {
       case GoogleOAuthFailureKind.cancelled:
         return 'Utilisateur a annulé';
       case GoogleOAuthFailureKind.serverClientIdMissing:
-        return 'Server Client ID incorrect / manquant';
+        return 'Server Client ID manquant';
       case GoogleOAuthFailureKind.oauthAndroidMisconfigured:
-        return 'OAuth Android incorrect (package / SHA-1 / clients Cloud)';
+        return 'Package ou SHA-1 non reconnu par Google';
+      case GoogleOAuthFailureKind.serverClientIdInvalid:
+        return 'Server Client ID invalide';
+      case GoogleOAuthFailureKind.calendarApiDisabled:
+        return 'Google Calendar API non activée';
       case GoogleOAuthFailureKind.network:
         return 'Connexion réseau impossible';
       case GoogleOAuthFailureKind.permissionDenied:
-        return 'Permission refusée';
+        return 'Autorisation Google Calendar refusée';
       case GoogleOAuthFailureKind.tokenUnavailable:
         return 'Token indisponible';
       case GoogleOAuthFailureKind.unknown:
@@ -48,28 +56,34 @@ extension GoogleOAuthFailureKindX on GoogleOAuthFailureKind {
     }
   }
 
-  /// User-facing French message (SnackBar). No secrets.
   String get userMessage {
     switch (this) {
       case GoogleOAuthFailureKind.cancelled:
         return 'Connexion Google annulée.';
       case GoogleOAuthFailureKind.serverClientIdMissing:
         return 'Configuration Google incomplète.\n'
-            'Le compte Google peut être sélectionné, mais l’accès à '
-            'Google Calendar nécessite une configuration OAuth complète '
-            '(Client ID Web / GOOGLE_SERVER_CLIENT_ID).\n'
-            'Package : com.example.bloom — voir docs/google_calendar_oauth.md';
-      case GoogleOAuthFailureKind.oauthAndroidMisconfigured:
-        return 'La configuration Google de Bloom semble incorrecte.\n'
-            'OAuth Android : vérifie package com.example.bloom, '
-            'SHA-1 debug et client Web '
-            '(même projet Google Cloud).\n'
+            'Sans google-services.json, Android a besoin d’un Client ID Web '
+            '(GOOGLE_SERVER_CLIENT_ID) en plus du client OAuth Android '
+            '(package com.example.bloom + SHA-1).\n'
             'Voir docs/google_calendar_oauth.md';
+      case GoogleOAuthFailureKind.oauthAndroidMisconfigured:
+        return 'Package ou SHA-1 non reconnu par Google.\n'
+            'Vérifie le client OAuth Android : package com.example.bloom '
+            'et le SHA-1 du build debug (keytool / signingReport).\n'
+            'Voir docs/google_calendar_oauth.md';
+      case GoogleOAuthFailureKind.serverClientIdInvalid:
+        return 'Server Client ID invalide.\n'
+            'Utilise le Client ID Web du même projet Google Cloud '
+            'que le client Android (pas le Client ID Android).';
+      case GoogleOAuthFailureKind.calendarApiDisabled:
+        return 'Google Calendar API non activée.\n'
+            'Active « Google Calendar API » dans Google Cloud Console '
+            'pour ce projet.';
       case GoogleOAuthFailureKind.network:
         return 'Connexion Google impossible.\n'
             'Vérifie ta connexion Internet et réessaie.';
       case GoogleOAuthFailureKind.permissionDenied:
-        return 'Permission Google Calendar refusée.\n'
+        return 'Autorisation Google Calendar refusée.\n'
             'Réessaie et accepte l’accès au calendrier.';
       case GoogleOAuthFailureKind.tokenUnavailable:
         return 'Session Google expirée ou token indisponible.\n'
@@ -81,7 +95,6 @@ extension GoogleOAuthFailureKindX on GoogleOAuthFailureKind {
   }
 }
 
-/// Result of classifying a sign-in / API failure.
 @immutable
 class GoogleOAuthFailure {
   final GoogleOAuthFailureKind kind;

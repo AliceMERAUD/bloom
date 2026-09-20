@@ -433,8 +433,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     'Server Client ID : '
                     '${GoogleSignInConfig.hasServerClientId ? "configuré" : "MANQUANT"}\n'
                     'google-services.json : absent du dépôt\n'
-                    'Le sélecteur de compte Google doit s’ouvrir même si '
-                    'le Server Client ID manque ; l’accès Calendar peut échouer après.',
+                    'Flux : sélecteur de compte d’abord, '
+                    'scopes Calendar ensuite (requestScopes).',
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                 ],

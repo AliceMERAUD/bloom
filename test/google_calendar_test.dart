@@ -56,6 +56,14 @@ void main() {
         GoogleOAuthFailureKind.serverClientIdMissing.userMessage,
         contains('com.example.bloom'),
       );
+      expect(
+        GoogleOAuthFailureKind.oauthAndroidMisconfigured.debugLabel,
+        contains('SHA-1'),
+      );
+      expect(
+        GoogleOAuthFailureKind.permissionDenied.debugLabel,
+        contains('Autorisation'),
+      );
     });
   });
 

@@ -5,28 +5,29 @@ import 'package:googleapis/calendar/v3.dart' as gcal;
 /// OAuth wiring for Google Calendar (Android / iOS).
 ///
 /// Bloom does **not** ship a hardcoded client ID.
-/// Without `google-services.json`, Android requires a **Web** OAuth client ID
-/// passed as [serverClientId] (never the Android client ID).
 ///
-/// Build example:
+/// Account picker: `GoogleSignIn.signIn()` is always attempted (no local
+/// pre-block). Calendar scopes are requested **after** account selection via
+/// [requestScopes].
+///
+/// Without `google-services.json`, Android typically also needs a **Web**
+/// OAuth client ID as [serverClientId] (same Cloud project as the Android
+/// client). Pass it at build time — never invent a value in source:
 /// ```bash
-/// flutter run --dart-define=GOOGLE_SERVER_CLIENT_ID=123-abc.apps.googleusercontent.com
+/// flutter run --dart-define=GOOGLE_SERVER_CLIENT_ID=….apps.googleusercontent.com
 /// ```
 ///
-/// See `docs/google_calendar_oauth.md` for Cloud Console steps (package + SHA-1).
+/// See `docs/google_calendar_oauth.md`.
 class GoogleSignInConfig {
   GoogleSignInConfig._();
 
-  /// Web client ID from Google Cloud Console → Credentials → OAuth 2.0 Client IDs
-  /// (type **Web application**). Empty if not provided at build time.
   static const String serverClientIdFromEnvironment = String.fromEnvironment(
     'GOOGLE_SERVER_CLIENT_ID',
   );
 
-  /// Package / applicationId used by this app (must match Android OAuth client).
   static const String androidApplicationId = 'com.example.bloom';
 
-  /// Narrow scopes: events write + calendar list read.
+  /// Strict Calendar scopes only (never wellbeing / Drive / etc.).
   static const List<String> calendarScopes = [
     gcal.CalendarApi.calendarEventsScope,
     gcal.CalendarApi.calendarReadonlyScope,
@@ -39,6 +40,10 @@ class GoogleSignInConfig {
 
   static bool get hasServerClientId => resolvedServerClientId != null;
 
+  /// Builds [GoogleSignIn] for the account-picker phase.
+  ///
+  /// Calendar scopes are intentionally **empty** here so Google can present
+  /// the account chooser first; [calendarScopes] are requested afterward.
   static GoogleSignIn createSignIn() {
     final serverClientId = resolvedServerClientId;
     if (kDebugMode) {
@@ -46,22 +51,12 @@ class GoogleSignInConfig {
         '[Bloom GCal] GoogleSignIn init '
         'applicationId=$androidApplicationId '
         'serverClientId=${serverClientId == null ? "MISSING" : "SET"} '
-        'scopes=${calendarScopes.length}',
+        'initialScopes=0 (Calendar via requestScopes after picker)',
       );
-      if (serverClientId == null) {
-        debugPrint(
-          '[Bloom GCal] NOTE: GOOGLE_SERVER_CLIENT_ID not set. '
-          'Account picker can still open; Calendar API access may fail '
-          'until a Web OAuth client ID is provided. '
-          'See docs/google_calendar_oauth.md',
-        );
-      }
     }
-    // Pass null serverClientId when unset — do not invent a placeholder.
-    // Account selection must still be attempted via GoogleSignIn.signIn().
     return GoogleSignIn(
       serverClientId: serverClientId,
-      scopes: calendarScopes,
+      scopes: const <String>[],
     );
   }
 }
