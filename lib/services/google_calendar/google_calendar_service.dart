@@ -45,11 +45,15 @@ class GoogleCalendarService {
     final email = await _backend.signIn();
     if (email == null) return false;
 
+    GoogleCalendarException? listError;
     var calendars = <GoogleCalendarInfo>[];
     try {
       calendars = await _backend.listCalendars();
+    } on GoogleCalendarException catch (e) {
+      // Account picker already succeeded — surface OAuth/Calendar gaps after.
+      listError = e;
     } catch (_) {
-      // Still mark connected; user can retry listing.
+      // Soft-fail listing; user can retry from settings.
     }
 
     GoogleCalendarInfo? selected;
@@ -83,6 +87,11 @@ class GoogleCalendarService {
       ),
     );
     BloomRefresh.notify();
+
+    // Sign-in worked; Calendar API did not — keep account, explain next step.
+    if (listError != null && calendars.isEmpty) {
+      throw listError;
+    }
     return true;
   }
 

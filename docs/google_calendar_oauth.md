@@ -14,13 +14,20 @@
 
 ### Cause exacte de l’échec actuel
 
-Bloom tourne **sans** `google-services.json`. Sur Android, `google_sign_in` exige alors le **Client ID Web** en `serverClientId`.
+Bloom tourne **sans** `google-services.json`. Sur Android, l’accès **Calendar API**
+bénéficie fortement d’un **Client ID Web** en `serverClientId`
+(`GOOGLE_SERVER_CLIENT_ID`).
 
-Ce client n’est **pas** configuré → catégorie diagnostic :
+**Important :** l’absence de ce Client ID **ne doit pas** bloquer le sélecteur
+de compte Google. Le flux attendu est :
 
 ```text
-Server Client ID incorrect / manquant
+Connecter Google → sélecteur de comptes → (ensuite) OAuth / Calendar
 ```
+
+Si le Client ID Web manque, l’erreur « Server Client ID manquant / config incomplète »
+apparaît **après** la sélection du compte (lors de l’accès token / liste des calendriers),
+pas avant.
 
 Même après ajout du client Web, le client **Android** doit correspondre à :
 
@@ -30,7 +37,7 @@ package = com.example.bloom
 SHA-1 du keystore debug utilisé par flutter run
 ```
 
-Sinon → `ApiException: 10` / `OAuth Android incorrect`.
+Sinon → `ApiException: 10` / `OAuth Android incorrect` **après** sélection du compte.
 
 **Le réseau n’est pas la cause principale** tant que OAuth n’est pas configuré.
 

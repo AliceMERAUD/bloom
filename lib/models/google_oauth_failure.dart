@@ -54,11 +54,11 @@ extension GoogleOAuthFailureKindX on GoogleOAuthFailureKind {
       case GoogleOAuthFailureKind.cancelled:
         return 'Connexion Google annulée.';
       case GoogleOAuthFailureKind.serverClientIdMissing:
-        return 'La configuration Google de Bloom semble incorrecte.\n'
-            'Server Client ID Web manquant '
-            '(GOOGLE_SERVER_CLIENT_ID).\n'
-            'Package attendu : com.example.bloom\n'
-            'Voir docs/google_calendar_oauth.md';
+        return 'Configuration Google incomplète.\n'
+            'Le compte Google peut être sélectionné, mais l’accès à '
+            'Google Calendar nécessite une configuration OAuth complète '
+            '(Client ID Web / GOOGLE_SERVER_CLIENT_ID).\n'
+            'Package : com.example.bloom — voir docs/google_calendar_oauth.md';
       case GoogleOAuthFailureKind.oauthAndroidMisconfigured:
         return 'La configuration Google de Bloom semble incorrecte.\n'
             'OAuth Android : vérifie package com.example.bloom, '

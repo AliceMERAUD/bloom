@@ -50,13 +50,15 @@ class GoogleSignInConfig {
       );
       if (serverClientId == null) {
         debugPrint(
-          '[Bloom GCal] WARNING: GOOGLE_SERVER_CLIENT_ID not set and '
-          'google-services.json is typically absent — Android Sign-In '
-          'will fail with DEVELOPER_ERROR until OAuth is configured. '
+          '[Bloom GCal] NOTE: GOOGLE_SERVER_CLIENT_ID not set. '
+          'Account picker can still open; Calendar API access may fail '
+          'until a Web OAuth client ID is provided. '
           'See docs/google_calendar_oauth.md',
         );
       }
     }
+    // Pass null serverClientId when unset — do not invent a placeholder.
+    // Account selection must still be attempted via GoogleSignIn.signIn().
     return GoogleSignIn(
       serverClientId: serverClientId,
       scopes: calendarScopes,

@@ -51,6 +51,9 @@ class LiveGoogleCalendarBackend implements GoogleCalendarBackend {
     final client = await _signIn.authenticatedClient();
     if (client == null) {
       _log('authenticatedClient returned null (token unavailable)');
+      if (!GoogleSignInConfig.hasServerClientId) {
+        _throwKind(GoogleOAuthFailureKind.serverClientIdMissing);
+      }
       _throwKind(GoogleOAuthFailureKind.tokenUnavailable);
     }
     return client;
@@ -74,14 +77,12 @@ class LiveGoogleCalendarBackend implements GoogleCalendarBackend {
   @override
   Future<String?> signIn() async {
     try {
-      if (!GoogleSignInConfig.hasServerClientId) {
-        _log(
-          'signIn blocked: GOOGLE_SERVER_CLIENT_ID missing '
-          '(no google-services.json in project)',
-        );
-        _throwKind(GoogleOAuthFailureKind.serverClientIdMissing);
-      }
-      _log('signIn started');
+      // Never block before the account picker — missing Web client ID is
+      // diagnosed after Google Sign-In / when Calendar tokens are needed.
+      _log(
+        'signIn started '
+        '(serverClientId=${GoogleSignInConfig.hasServerClientId ? "SET" : "MISSING"})',
+      );
       final account = await _signIn.signIn();
       if (account == null) {
         _log('signIn cancelled by user');
