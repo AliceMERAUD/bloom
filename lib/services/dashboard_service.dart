@@ -1,9 +1,11 @@
+import '../models/task.dart';
 import '../models/wellbeing_entry.dart';
 import '../models/workout_session.dart';
 import 'exercise_service.dart';
 import 'puzzle_catalog.dart';
 import 'puzzle_progress_service.dart';
 import 'storage_service.dart';
+import 'task_service.dart';
 import 'wellbeing_service.dart';
 import 'workout_session_service.dart';
 
@@ -21,6 +23,9 @@ class DashboardSnapshot {
   final int puzzleTotal;
   final String? nextPuzzleId;
   final String? nextPuzzleTitle;
+  final int pendingTaskCount;
+  final int completedTasksToday;
+  final List<String> topPendingTaskTitles;
 
   const DashboardSnapshot({
     required this.closedSessionCount,
@@ -35,6 +40,9 @@ class DashboardSnapshot {
     required this.puzzleTotal,
     required this.nextPuzzleId,
     required this.nextPuzzleTitle,
+    required this.pendingTaskCount,
+    required this.completedTasksToday,
+    required this.topPendingTaskTitles,
   });
 
   bool get hasSportHistory => closedSessionCount > 0 || openSession != null;
@@ -56,6 +64,12 @@ class DashboardService {
     final progress = PuzzleProgressService.load();
     final nextId = progress.nextPlayableId;
 
+    final pending = TaskService.getPendingTasks();
+    final dueFirst = [
+      ...pending.where((t) => t.isOverdue || t.isDueToday),
+      ...pending.where((t) => !t.isOverdue && !t.isDueToday),
+    ];
+
     return DashboardSnapshot(
       closedSessionCount: closed.length,
       totalSetCount: sets.length,
@@ -70,6 +84,10 @@ class DashboardService {
       nextPuzzleId: nextId,
       nextPuzzleTitle:
           nextId == null ? null : PuzzleCatalog.byId(nextId).title,
+      pendingTaskCount: pending.length,
+      completedTasksToday: TaskService.completedTodayCount(),
+      topPendingTaskTitles:
+          dueFirst.take(3).map((BloomTask t) => t.title).toList(),
     );
   }
 }

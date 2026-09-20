@@ -7,7 +7,7 @@ import '../models/app_settings.dart';
 
 /// Local-only reminders via [flutter_local_notifications].
 ///
-/// No server, no push. Scheduling is daily at the configured local time.
+/// Module reminders use ids 1001–1003. Task reminders use ids >= 2000.
 /// Tests can leave [enabled] false so no plugin calls are made.
 class ReminderService {
   static final FlutterLocalNotificationsPlugin _plugin =
@@ -16,9 +16,13 @@ class ReminderService {
   static bool _initialized = false;
   static bool enabled = true;
 
-  static const _sportId = 1001;
-  static const _wellbeingId = 1002;
-  static const _puzzleId = 1003;
+  static const sportId = 1001;
+  static const wellbeingId = 1002;
+  static const puzzleId = 1003;
+  static const taskIdBase = 2000;
+
+  static int notificationIdForTask(String taskId) =>
+      taskIdBase + (taskId.hashCode.abs() % 800000);
 
   static Future<void> init() async {
     if (!enabled || _initialized) return;
@@ -57,12 +61,16 @@ class ReminderService {
     if (!enabled) return;
     try {
       await init();
-      await cancelAll();
+      // Only cancel module reminders — task one-shots use other ids.
+      await cancelId(sportId);
+      await cancelId(wellbeingId);
+      await cancelId(puzzleId);
+
       if (!settings.notificationsEnabled) return;
 
       if (settings.sportReminders) {
         await _scheduleDaily(
-          id: _sportId,
+          id: sportId,
           title: 'Bloom — Sport',
           body: 'C’est l’heure de ta séance !',
           hour: settings.reminderHour,
@@ -71,7 +79,7 @@ class ReminderService {
       }
       if (settings.wellbeingReminders) {
         await _scheduleDaily(
-          id: _wellbeingId,
+          id: wellbeingId,
           title: 'Bloom — Bien-être',
           body: 'Comment vas-tu aujourd’hui ?',
           hour: settings.reminderHour,
@@ -80,7 +88,7 @@ class ReminderService {
       }
       if (settings.puzzleReminders) {
         await _scheduleDaily(
-          id: _puzzleId,
+          id: puzzleId,
           title: 'Bloom — Puzzle',
           body: 'Ton puzzle du jour t’attend !',
           hour: settings.reminderHour,
@@ -92,11 +100,57 @@ class ReminderService {
     }
   }
 
+  static Future<void> cancelId(int id) async {
+    if (!enabled) return;
+    try {
+      await init();
+      await _plugin.cancel(id);
+    } catch (_) {}
+  }
+
   static Future<void> cancelAll() async {
     if (!enabled) return;
     try {
       await _plugin.cancelAll();
     } catch (_) {}
+  }
+
+  /// One-shot local notification at [when].
+  static Future<void> scheduleAt({
+    required int id,
+    required String title,
+    required String body,
+    required DateTime when,
+  }) async {
+    if (!enabled) return;
+    try {
+      await init();
+      await _plugin.cancel(id);
+      if (when.isBefore(DateTime.now())) return;
+
+      final android = AndroidNotificationDetails(
+        'bloom_reminders',
+        'Rappels Bloom',
+        channelDescription: 'Rappels locaux Bloom',
+        importance: Importance.defaultImportance,
+        priority: Priority.defaultPriority,
+      );
+      final details = NotificationDetails(android: android);
+      final scheduled = tz.TZDateTime.from(when, tz.local);
+
+      await _plugin.zonedSchedule(
+        id,
+        title,
+        body,
+        scheduled,
+        details,
+        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+      );
+    } catch (e) {
+      debugPrint('Reminder scheduleAt: $e');
+    }
   }
 
   static Future<void> _scheduleDaily({

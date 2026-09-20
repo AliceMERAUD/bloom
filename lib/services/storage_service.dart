@@ -1,6 +1,7 @@
 import 'package:hive_flutter/hive_flutter.dart';
 
 import '../models/app_settings.dart';
+import '../models/task.dart';
 import '../models/wellbeing_entry.dart';
 import '../models/workout_session.dart';
 import '../models/workout_set.dart';
@@ -12,6 +13,7 @@ class StorageService {
   static const String wellbeingBoxName = 'wellbeing_entries';
   static const String puzzleProgressBoxName = 'puzzle_progress';
   static const String settingsBoxName = 'app_settings';
+  static const String tasksBoxName = 'tasks';
 
   static Future<void> init() async {
     await Hive.initFlutter();
@@ -20,6 +22,7 @@ class StorageService {
     await Hive.openBox(wellbeingBoxName);
     await Hive.openBox(puzzleProgressBoxName);
     await Hive.openBox(settingsBoxName);
+    await Hive.openBox(tasksBoxName);
   }
 
   /// Initialise Hive avec un chemin local (tests unitaires).
@@ -35,6 +38,7 @@ class StorageService {
     await Hive.openBox(wellbeingBoxName);
     await Hive.openBox(puzzleProgressBoxName);
     await Hive.openBox(settingsBoxName);
+    await Hive.openBox(tasksBoxName);
   }
 
   static Future<void> closeForTesting() async {
@@ -46,6 +50,7 @@ class StorageService {
   static Box get _wellbeingBox => Hive.box(wellbeingBoxName);
   static Box get _puzzleBox => Hive.box(puzzleProgressBoxName);
   static Box get _settingsBox => Hive.box(settingsBoxName);
+  static Box get _tasksBox => Hive.box(tasksBoxName);
 
   static Future<String> saveWorkoutSet(WorkoutSet workoutSet) async {
     final id = DateTime.now().microsecondsSinceEpoch.toString();
@@ -247,8 +252,46 @@ class StorageService {
     await _sessionBox.clear();
     await _wellbeingBox.clear();
     await _puzzleBox.clear();
+    await _tasksBox.clear();
     if (!keepSettings) {
       await _settingsBox.clear();
     }
+  }
+
+  // --- Tasks ---
+
+  static Future<void> saveTask(BloomTask task) async {
+    await _tasksBox.put(task.id, task.toMap());
+  }
+
+  static BloomTask? getTask(String id) {
+    final raw = _tasksBox.get(id);
+    if (raw is Map) return BloomTask.fromMap(raw);
+    return null;
+  }
+
+  static List<BloomTask> getAllTasks() {
+    final tasks = _tasksBox.values
+        .whereType<Map>()
+        .map((value) => BloomTask.fromMap(value))
+        .toList();
+    tasks.sort((a, b) {
+      if (a.completed != b.completed) {
+        return a.completed ? 1 : -1;
+      }
+      final ad = a.dueDate;
+      final bd = b.dueDate;
+      if (ad == null && bd == null) {
+        return b.createdAt.compareTo(a.createdAt);
+      }
+      if (ad == null) return 1;
+      if (bd == null) return -1;
+      return ad.compareTo(bd);
+    });
+    return tasks;
+  }
+
+  static Future<void> deleteTask(String id) async {
+    await _tasksBox.delete(id);
   }
 }

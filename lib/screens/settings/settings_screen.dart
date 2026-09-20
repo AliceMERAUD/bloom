@@ -9,6 +9,7 @@ import '../../services/data_export_service.dart';
 import '../../services/reminder_service.dart';
 import '../../services/settings_service.dart';
 import '../../services/storage_service.dart';
+import '../../services/task_service.dart';
 import '../../services/workout_session_service.dart';
 import '../../widgets/common/bloom_widgets.dart';
 
@@ -24,7 +25,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Future<void> _update(AppSettings Function(AppSettings) fn) async {
     await SettingsService.update(fn);
+    await TaskService.rescheduleAllReminders(SettingsService.current);
     if (mounted) setState(() {});
+  }
+
+  Future<void> _toggleNotifications(bool value) async {
+    if (value) {
+      final ok = await ReminderService.requestPermission();
+      if (!ok && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Permission refusée. Tu peux l’activer dans les réglages Android.',
+            ),
+          ),
+        );
+      }
+    }
+    await _update((s) => s.copyWith(notificationsEnabled: value));
   }
 
   Future<void> _pickTime() async {
@@ -43,22 +61,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
         reminderMinute: picked.minute,
       ),
     );
-  }
-
-  Future<void> _toggleNotifications(bool value) async {
-    if (value) {
-      final ok = await ReminderService.requestPermission();
-      if (!ok && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Permission refusée. Tu peux l’activer dans les réglages Android.',
-            ),
-          ),
-        );
-      }
-    }
-    await _update((s) => s.copyWith(notificationsEnabled: value));
   }
 
   Future<void> _export() async {
@@ -154,7 +156,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       builder: (ctx) => AlertDialog(
         title: const Text('Supprimer toutes mes données'),
         content: const Text(
-          'Action irréversible. Sport, Bien-être et Puzzle seront effacés. '
+          'Action irréversible. Sport, Bien-être, Puzzle et Tasks seront effacés. '
           'Les préférences (thème, rappels) sont conservées.',
         ),
         actions: [
@@ -174,6 +176,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
     if (confirmed != true) return;
 
+    for (final task in TaskService.getTasks()) {
+      if (task.reminderId != null) {
+        await ReminderService.cancelId(task.reminderId!);
+      }
+    }
     await StorageService.clearAllUserData(keepSettings: true);
     WorkoutSessionService.resetForTesting();
     if (!mounted) return;
