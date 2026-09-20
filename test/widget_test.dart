@@ -34,5 +34,7 @@ void main() {
     expect(find.text('Tasks'), findsWidgets);
     expect(find.text('Puzzle'), findsWidgets);
     expect(find.text('Accueil'), findsOneWidget);
+    expect(find.text('Plus'), findsNothing);
+    expect(find.byTooltip('Paramètres'), findsOneWidget);
   });
 }
