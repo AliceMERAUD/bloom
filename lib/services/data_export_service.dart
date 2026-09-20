@@ -1,6 +1,8 @@
 import 'dart:convert';
 
 import '../models/app_settings.dart';
+import '../models/sport_activity.dart';
+import '../models/sport_bag_item.dart';
 import '../models/task.dart';
 import '../models/wellbeing_entry.dart';
 import '../models/workout_session.dart';
@@ -8,6 +10,7 @@ import '../models/workout_set.dart';
 import 'puzzle_progress_service.dart';
 import 'reminder_service.dart';
 import 'settings_service.dart';
+import 'sport_activity_service.dart';
 import 'storage_service.dart';
 import 'task_service.dart';
 import 'workout_session_service.dart';
@@ -24,7 +27,7 @@ class DataExportException implements Exception {
 ///
 /// Choice: plain JSON (no extra DB) so users can inspect / archive files.
 class DataExportService {
-  static const int formatVersion = 1;
+  static const int formatVersion = 2;
 
   static Map<String, dynamic> buildExportMap({
     DateTime? exportedAt,
@@ -49,6 +52,13 @@ class DataExportService {
               ),
             )
             .toList(),
+      },
+      'sportActivities': {
+        'items':
+            StorageService.getAllSportActivities().map((a) => a.toMap()).toList(),
+      },
+      'sportBag': {
+        'items': StorageService.getAllBagItems().map((i) => i.toMap()).toList(),
       },
       'wellbeing': {
         'entries': wellbeing.map((e) => e.toMap()).toList(),
@@ -85,9 +95,10 @@ class DataExportService {
     if (version is! num) {
       throw const DataExportException('Version d’export manquante.');
     }
-    if (version.toInt() != formatVersion) {
+    final v = version.toInt();
+    if (v != 1 && v != 2) {
       throw DataExportException(
-        'Version d’export non supportée (${version.toInt()}).',
+        'Version d’export non supportée ($v).',
       );
     }
     if (data['app'] != null && data['app'] != 'bloom') {
@@ -125,6 +136,25 @@ class DataExportService {
       final map = Map<String, dynamic>.from(item as Map);
       final session = WorkoutSession.fromMap(map);
       await StorageService.putWorkoutSessionRaw(session.id, session.toMap());
+    }
+
+    // v1 exports omit these; empty is fine.
+    final sportActivities =
+        Map<String, dynamic>.from(data['sportActivities'] as Map? ?? {});
+    final activityItems =
+        List<dynamic>.from(sportActivities['items'] as List? ?? []);
+    for (final item in activityItems) {
+      final activity = SportActivity.fromMap(item as Map);
+      await StorageService.saveSportActivity(activity);
+    }
+    await SportActivityService.ensureDefaults();
+
+    final sportBag =
+        Map<String, dynamic>.from(data['sportBag'] as Map? ?? {});
+    final bagItems = List<dynamic>.from(sportBag['items'] as List? ?? []);
+    for (final item in bagItems) {
+      final bagItem = SportBagItem.fromMap(item as Map);
+      await StorageService.saveBagItem(bagItem);
     }
 
     final wellbeing = Map<String, dynamic>.from(data['wellbeing'] as Map? ?? {});

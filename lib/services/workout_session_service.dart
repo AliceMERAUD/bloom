@@ -1,4 +1,5 @@
 import '../models/workout_set.dart';
+import 'bloom_refresh.dart';
 import 'storage_service.dart';
 
 enum StartSessionOutcome {
@@ -113,6 +114,7 @@ class WorkoutSessionService {
     }
 
     _currentSessionId = null;
+    BloomRefresh.notify();
   }
 
   /// Test-only: clears the in-memory session pointer without touching Hive.

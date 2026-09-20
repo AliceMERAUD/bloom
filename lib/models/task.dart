@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 enum TaskCategory {
+  sport,
   room,
   laundry,
   trash,
@@ -13,6 +14,8 @@ enum TaskCategory {
 extension TaskCategoryX on TaskCategory {
   String get label {
     switch (this) {
+      case TaskCategory.sport:
+        return 'Sport';
       case TaskCategory.room:
         return 'Chambre';
       case TaskCategory.laundry:
@@ -32,6 +35,8 @@ extension TaskCategoryX on TaskCategory {
 
   IconData get icon {
     switch (this) {
+      case TaskCategory.sport:
+        return Icons.fitness_center_outlined;
       case TaskCategory.room:
         return Icons.bed_outlined;
       case TaskCategory.laundry:
@@ -124,6 +129,12 @@ class BloomTask {
   final bool reminderEnabled;
   final int? reminderId;
 
+  /// Minutes before due time to fire the reminder (0 = at due time).
+  final int reminderMinutesBefore;
+
+  /// Optional link to a [SportActivity] id.
+  final String? sportId;
+
   /// Links a completed recurring task to the next occurrence (avoids duplicates).
   final String? nextOccurrenceId;
 
@@ -141,6 +152,8 @@ class BloomTask {
     this.recurrence = TaskRecurrence.none,
     this.reminderEnabled = false,
     this.reminderId,
+    this.reminderMinutesBefore = 0,
+    this.sportId,
     this.nextOccurrenceId,
   });
 
@@ -182,6 +195,8 @@ class BloomTask {
     TaskRecurrence? recurrence,
     bool? reminderEnabled,
     int? reminderId,
+    int? reminderMinutesBefore,
+    String? sportId,
     String? nextOccurrenceId,
     bool clearDescription = false,
     bool clearDueDate = false,
@@ -189,6 +204,7 @@ class BloomTask {
     bool clearCompletedAt = false,
     bool clearReminderId = false,
     bool clearNextOccurrenceId = false,
+    bool clearSportId = false,
   }) {
     return BloomTask(
       id: id ?? this.id,
@@ -205,6 +221,9 @@ class BloomTask {
       recurrence: recurrence ?? this.recurrence,
       reminderEnabled: reminderEnabled ?? this.reminderEnabled,
       reminderId: clearReminderId ? null : (reminderId ?? this.reminderId),
+      reminderMinutesBefore:
+          reminderMinutesBefore ?? this.reminderMinutesBefore,
+      sportId: clearSportId ? null : (sportId ?? this.sportId),
       nextOccurrenceId: clearNextOccurrenceId
           ? null
           : (nextOccurrenceId ?? this.nextOccurrenceId),
@@ -226,6 +245,8 @@ class BloomTask {
         'recurrence': recurrence.name,
         'reminderEnabled': reminderEnabled,
         'reminderId': reminderId,
+        'reminderMinutesBefore': reminderMinutesBefore,
+        'sportId': sportId,
         'nextOccurrenceId': nextOccurrenceId,
       };
 
@@ -253,6 +274,9 @@ class BloomTask {
       recurrence: TaskRecurrenceX.fromName(data['recurrence'] as String?),
       reminderEnabled: data['reminderEnabled'] as bool? ?? false,
       reminderId: (data['reminderId'] as num?)?.toInt(),
+      reminderMinutesBefore:
+          (data['reminderMinutesBefore'] as num?)?.toInt() ?? 0,
+      sportId: data['sportId'] as String?,
       nextOccurrenceId: data['nextOccurrenceId'] as String?,
     );
   }

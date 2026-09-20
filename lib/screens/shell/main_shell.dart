@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../services/bloom_refresh.dart';
 import '../home/home_screen.dart';
 import '../puzzle/puzzle_screen.dart';
 import '../settings/settings_screen.dart';
@@ -27,7 +28,11 @@ class MainShellState extends State<MainShell> {
   }
 
   void goToTab(int index) {
-    setState(() => _index = index.clamp(0, 4));
+    final next = index.clamp(0, 4);
+    if (next == 0) {
+      BloomRefresh.notify();
+    }
+    setState(() => _index = next);
   }
 
   @override

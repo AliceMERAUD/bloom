@@ -24,6 +24,8 @@ class DashboardSnapshot {
   final String? nextPuzzleId;
   final String? nextPuzzleTitle;
   final int pendingTaskCount;
+  final int overdueTaskCount;
+  final int dueTodayTaskCount;
   final int completedTasksToday;
   final List<String> topPendingTaskTitles;
 
@@ -41,6 +43,8 @@ class DashboardSnapshot {
     required this.nextPuzzleId,
     required this.nextPuzzleTitle,
     required this.pendingTaskCount,
+    required this.overdueTaskCount,
+    required this.dueTodayTaskCount,
     required this.completedTasksToday,
     required this.topPendingTaskTitles,
   });
@@ -85,6 +89,8 @@ class DashboardService {
       nextPuzzleTitle:
           nextId == null ? null : PuzzleCatalog.byId(nextId).title,
       pendingTaskCount: pending.length,
+      overdueTaskCount: TaskService.overdueCount(),
+      dueTodayTaskCount: TaskService.dueTodayCount(),
       completedTasksToday: TaskService.completedTodayCount(),
       topPendingTaskTitles:
           dueFirst.take(3).map((BloomTask t) => t.title).toList(),

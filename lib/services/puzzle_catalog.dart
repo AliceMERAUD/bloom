@@ -1,22 +1,38 @@
 import '../models/puzzle/puzzle.dart';
 import '../models/puzzle/puzzle_constraint.dart';
+import '../models/puzzle/puzzle_geometry.dart';
 import '../models/puzzle/puzzle_models.dart';
-
-List<PuzzlePosition> _row(int count) {
-  return List.generate(
-    count,
-    (index) => PuzzlePosition(
-      id: 'p$index',
-      index: index,
-      label: '${index + 1}',
-    ),
-  );
-}
 
 PuzzleCharacter _c(String id, String name) =>
     PuzzleCharacter(id: id, name: name, assetKey: id);
 
-/// Deterministic catalog of 15 V1 logic puzzles.
+Puzzle _gridPuzzle({
+  required String id,
+  required String title,
+  required String description,
+  required String scenario,
+  required PuzzleDifficulty difficulty,
+  required List<PuzzleCharacter> characters,
+  required List<String> layout,
+  required List<PuzzleConstraint> constraints,
+  required Map<String, int> referenceSolution,
+}) {
+  final geo = PuzzleGeometry.fromAscii(layout: layout);
+  return Puzzle(
+    id: id,
+    title: title,
+    description: description,
+    scenario: scenario,
+    difficulty: difficulty,
+    characters: characters,
+    positions: positionsFromGeometry(geo),
+    constraints: constraints,
+    referenceSolution: referenceSolution,
+    geometry: geo,
+  );
+}
+
+/// Deterministic catalog of 15 Puzzle 2.0 grid logic puzzles.
 class PuzzleCatalog {
   static final List<Puzzle> all = List.unmodifiable([
     _p01(),
@@ -40,10 +56,11 @@ class PuzzleCatalog {
 
   static int indexOf(String id) => all.indexWhere((p) => p.id == id);
 
-  static Puzzle _p01() => Puzzle(
+  /// 2×3 bus — seats 0,1 / 2,3
+  static Puzzle _p01() => _gridPuzzle(
         id: 'bus_friends',
         title: 'Les amis dans le bus',
-        description: 'Quatre amis montent dans le bus.',
+        description: 'Quatre amis trouvent leur place dans le bus.',
         scenario: 'bus',
         difficulty: PuzzleDifficulty.easy,
         characters: [
@@ -52,45 +69,49 @@ class PuzzleCatalog {
           _c('charlie', 'Charlie'),
           _c('dana', 'Dana'),
         ],
-        positions: _row(4),
+        layout: const [
+          'W..',
+          'D..',
+        ],
         constraints: [
-          FixedPositionConstraint(
+          NearObjectConstraint(
             id: '1',
             characterId: 'alice',
-            index: 0,
-            description: 'Alice est à la place 1.',
+            objectId: 'window',
+            description: 'Alice est près de la fenêtre.',
+          ),
+          NearObjectConstraint(
+            id: '2',
+            characterId: 'dana',
+            objectId: 'door',
+            description: 'Dana est près de la porte.',
           ),
           AdjacentConstraint(
-            id: '2',
+            id: '3',
             a: 'alice',
             b: 'bob',
             description: 'Bob est à côté d’Alice.',
           ),
           BeforeConstraint(
-            id: '3',
+            id: '4',
             a: 'bob',
             b: 'charlie',
             description: 'Bob est avant Charlie.',
-          ),
-          BeforeConstraint(
-            id: '4',
-            a: 'charlie',
-            b: 'dana',
-            description: 'Charlie est avant Dana.',
           ),
         ],
         referenceSolution: {
           'alice': 0,
           'bob': 1,
-          'charlie': 2,
-          'dana': 3,
+          'dana': 2,
+          'charlie': 3,
         },
       );
 
-  static Puzzle _p02() => Puzzle(
+  /// 2×3 — seats 0,1 / 2,3,4
+  static Puzzle _p02() => _gridPuzzle(
         id: 'bus_commuters',
         title: 'Trajet du matin',
-        description: 'Cinq voyageurs partagent une rangée.',
+        description: 'Cinq voyageurs partagent la plate-forme.',
         scenario: 'bus',
         difficulty: PuzzleDifficulty.easy,
         characters: [
@@ -100,49 +121,53 @@ class PuzzleCatalog {
           _c('hugo', 'Hugo'),
           _c('iris', 'Iris'),
         ],
-        positions: _row(5),
+        layout: const [
+          'W..',
+          '...',
+        ],
         constraints: [
           FixedPositionConstraint(
             id: '1',
             characterId: 'eve',
-            index: 2,
-            description: 'Ève est au milieu (place 3).',
+            index: 3,
+            description: 'Ève est au centre, en bas.',
+          ),
+          NearObjectConstraint(
+            id: '2',
+            characterId: 'frank',
+            objectId: 'window',
+            description: 'Frank est près de la fenêtre.',
           ),
           AdjacentConstraint(
-            id: '2',
+            id: '3',
             a: 'eve',
-            b: 'frank',
-            description: 'Frank est à côté d’Ève.',
+            b: 'hugo',
+            description: 'Hugo est à côté d’Ève.',
+          ),
+          SameRowConstraint(
+            id: '4',
+            a: 'gina',
+            b: 'iris',
+            description: 'Gina et Iris sont sur la même rangée.',
           ),
           BeforeConstraint(
-            id: '3',
-            a: 'gina',
-            b: 'eve',
-            description: 'Gina est avant Ève.',
-          ),
-          AfterConstraint(
-            id: '4',
-            a: 'iris',
-            b: 'hugo',
-            description: 'Iris est après Hugo.',
-          ),
-          NotAdjacentConstraint(
             id: '5',
             a: 'gina',
-            b: 'hugo',
-            description: 'Gina n’est pas à côté de Hugo.',
+            b: 'iris',
+            description: 'Gina est avant Iris.',
           ),
         ],
         referenceSolution: {
           'gina': 0,
-          'frank': 1,
-          'eve': 2,
-          'hugo': 3,
-          'iris': 4,
+          'iris': 1,
+          'frank': 2,
+          'eve': 3,
+          'hugo': 4,
         },
       );
 
-  static Puzzle _p03() => Puzzle(
+  /// 2×4 — seats 0,1,2,3 / 4,5 with W..D on bottom
+  static Puzzle _p03() => _gridPuzzle(
         id: 'bus_school',
         title: 'Le bus scolaire',
         description: 'Six élèves doivent respecter le plan de places.',
@@ -156,7 +181,10 @@ class PuzzleCatalog {
           _c('paul', 'Paul'),
           _c('quin', 'Quinn'),
         ],
-        positions: _row(6),
+        layout: const [
+          '....',
+          'W..D',
+        ],
         constraints: [
           FixedPositionConstraint(
             id: '1',
@@ -164,38 +192,45 @@ class PuzzleCatalog {
             index: 0,
             description: 'Léa est à la place 1.',
           ),
-          AdjacentConstraint(
+          NearObjectConstraint(
             id: '2',
+            characterId: 'lea',
+            objectId: 'window',
+            description: 'Léa est près de la fenêtre.',
+          ),
+          NearObjectConstraint(
+            id: '3',
+            characterId: 'omar',
+            objectId: 'door',
+            description: 'Omar est près de la porte.',
+          ),
+          AdjacentConstraint(
+            id: '4',
             a: 'lea',
             b: 'max',
             description: 'Max est à côté de Léa.',
           ),
           BetweenConstraint(
-            id: '3',
+            id: '5',
             middle: 'nina',
             left: 'max',
             right: 'omar',
             description: 'Nina est entre Max et Omar.',
           ),
-          BeforeConstraint(
-            id: '4',
-            a: 'omar',
-            b: 'paul',
-            description: 'Omar est avant Paul.',
-          ),
-          AdjacentConstraint(
-            id: '5',
+          SameRowConstraint(
+            id: '6',
             a: 'paul',
             b: 'quin',
-            description: 'Paul est à côté de Quinn.',
+            description: 'Paul et Quinn sont sur la même rangée.',
           ),
-          AfterConstraint(
-            id: '6',
-            a: 'quin',
-            b: 'paul',
-            description: 'Quinn est après Paul.',
+          BeforeConstraint(
+            id: '7',
+            a: 'paul',
+            b: 'quin',
+            description: 'Paul est avant Quinn.',
           ),
         ],
+        // Lea0 Max1 Nina2 Omar3 Paul4 Quin5
         referenceSolution: {
           'lea': 0,
           'max': 1,
@@ -206,10 +241,11 @@ class PuzzleCatalog {
         },
       );
 
-  static Puzzle _p04() => Puzzle(
+  /// 2×3 — seats 0 / 1,2,3
+  static Puzzle _p04() => _gridPuzzle(
         id: 'wedding_family',
         title: 'Photo de famille',
-        description: 'La famille se range pour la photo.',
+        description: 'La famille se range près de la table.',
         scenario: 'mariage',
         difficulty: PuzzleDifficulty.easy,
         characters: [
@@ -218,13 +254,16 @@ class PuzzleCatalog {
           _c('claire', 'Claire'),
           _c('david', 'David'),
         ],
-        positions: _row(4),
+        layout: const [
+          '.T#',
+          '...',
+        ],
         constraints: [
-          FixedPositionConstraint(
+          NearObjectConstraint(
             id: '1',
             characterId: 'anne',
-            index: 1,
-            description: 'Anne est à la place 2.',
+            objectId: 'table',
+            description: 'Anne est près de la table.',
           ),
           AdjacentConstraint(
             id: '2',
@@ -232,28 +271,29 @@ class PuzzleCatalog {
             b: 'ben',
             description: 'Ben est à côté d’Anne.',
           ),
-          BeforeConstraint(
+          SameRowConstraint(
             id: '3',
             a: 'claire',
-            b: 'anne',
-            description: 'Claire est avant Anne.',
+            b: 'david',
+            description: 'Claire et David sont sur la même rangée.',
           ),
-          AfterConstraint(
+          BeforeConstraint(
             id: '4',
-            a: 'david',
-            b: 'ben',
-            description: 'David est après Ben.',
+            a: 'claire',
+            b: 'david',
+            description: 'Claire est avant David.',
           ),
         ],
         referenceSolution: {
-          'claire': 0,
-          'anne': 1,
-          'ben': 2,
+          'anne': 0,
+          'ben': 1,
+          'claire': 2,
           'david': 3,
         },
       );
 
-  static Puzzle _p05() => Puzzle(
+  /// 2×3 — seats 0,1 / 2,3,4
+  static Puzzle _p05() => _gridPuzzle(
         id: 'wedding_photos',
         title: 'Cortège nuptial',
         description: 'Cinq personnes forment le cortège.',
@@ -266,50 +306,59 @@ class PuzzleCatalog {
           _c('henri', 'Henri'),
           _c('ines', 'Inès'),
         ],
-        positions: _row(5),
+        layout: const [
+          '..D',
+          '...',
+        ],
         constraints: [
           FixedPositionConstraint(
             id: '1',
             characterId: 'emma',
-            index: 0,
-            description: 'Emma ouvre le cortège (place 1).',
+            index: 1,
+            description: 'Emma est près de la porte (place 2).',
+          ),
+          NearObjectConstraint(
+            id: '2',
+            characterId: 'emma',
+            objectId: 'door',
+            description: 'Emma est près de la porte.',
           ),
           AdjacentConstraint(
-            id: '2',
+            id: '3',
             a: 'emma',
             b: 'felix',
             description: 'Félix marche à côté d’Emma.',
           ),
-          BetweenConstraint(
-            id: '3',
-            middle: 'grace',
-            left: 'felix',
-            right: 'henri',
-            description: 'Grace est entre Félix et Henri.',
+          SameColConstraint(
+            id: '4',
+            a: 'felix',
+            b: 'grace',
+            description: 'Félix et Grace sont dans la même colonne.',
+          ),
+          AdjacentConstraint(
+            id: '5',
+            a: 'grace',
+            b: 'henri',
+            description: 'Henri est à côté de Grace.',
           ),
           BeforeConstraint(
-            id: '4',
-            a: 'henri',
-            b: 'ines',
-            description: 'Henri est avant Inès.',
-          ),
-          NotAdjacentConstraint(
-            id: '5',
-            a: 'emma',
-            b: 'grace',
-            description: 'Emma n’est pas à côté de Grace.',
+            id: '6',
+            a: 'grace',
+            b: 'henri',
+            description: 'Grace est avant Henri.',
           ),
         ],
         referenceSolution: {
-          'emma': 0,
-          'felix': 1,
+          'felix': 0,
+          'emma': 1,
           'grace': 2,
           'henri': 3,
           'ines': 4,
         },
       );
 
-  static Puzzle _p06() => Puzzle(
+  /// 2×3 — seats 0,1 / 2,3
+  static Puzzle _p06() => _gridPuzzle(
         id: 'waiting_clinic',
         title: 'Salle d’attente',
         description: 'Quatre patients attendent à la clinique.',
@@ -321,45 +370,49 @@ class PuzzleCatalog {
           _c('lina', 'Lina'),
           _c('marc', 'Marc'),
         ],
-        positions: _row(4),
+        layout: const [
+          '..D',
+          '..W',
+        ],
         constraints: [
-          FixedPositionConstraint(
+          NearObjectConstraint(
             id: '1',
             characterId: 'jade',
-            index: 3,
-            description: 'Jade est à la place 4.',
+            objectId: 'door',
+            description: 'Jade est près de la porte.',
           ),
-          AdjacentConstraint(
+          NearObjectConstraint(
             id: '2',
-            a: 'jade',
-            b: 'karl',
-            description: 'Karl est à côté de Jade.',
-          ),
-          BeforeConstraint(
-            id: '3',
-            a: 'lina',
-            b: 'karl',
-            description: 'Lina est avant Karl.',
+            characterId: 'karl',
+            objectId: 'window',
+            description: 'Karl est près de la fenêtre.',
           ),
           AdjacentConstraint(
-            id: '4',
+            id: '3',
             a: 'lina',
             b: 'marc',
             description: 'Marc est à côté de Lina.',
           ),
+          BeforeConstraint(
+            id: '4',
+            a: 'lina',
+            b: 'jade',
+            description: 'Lina est avant Jade.',
+          ),
         ],
         referenceSolution: {
           'lina': 0,
-          'marc': 1,
-          'karl': 2,
-          'jade': 3,
+          'jade': 1,
+          'marc': 2,
+          'karl': 3,
         },
       );
 
-  static Puzzle _p07() => Puzzle(
+  /// 2×3 — seats 0,1 / 2,3,4
+  static Puzzle _p07() => _gridPuzzle(
         id: 'waiting_station',
         title: 'Gare routière',
-        description: 'Cinq voyageurs attendent sur un banc.',
+        description: 'Cinq voyageurs attendent sur les bancs.',
         scenario: 'salle_attente',
         difficulty: PuzzleDifficulty.medium,
         characters: [
@@ -369,55 +422,66 @@ class PuzzleCatalog {
           _c('quentin', 'Quentin'),
           _c('rose', 'Rose'),
         ],
-        positions: _row(5),
+        layout: const [
+          'B..',
+          '...',
+        ],
         constraints: [
           FixedPositionConstraint(
             id: '1',
             characterId: 'nora',
-            index: 2,
-            description: 'Nora est au centre.',
+            index: 0,
+            description: 'Nora est près du banc (place 1).',
           ),
-          BeforeConstraint(
+          NearObjectConstraint(
             id: '2',
-            a: 'oscar',
-            b: 'nora',
-            description: 'Oscar est avant Nora.',
+            characterId: 'nora',
+            objectId: 'bench',
+            description: 'Nora est près du banc.',
           ),
           AdjacentConstraint(
             id: '3',
-            a: 'oscar',
-            b: 'piper',
-            description: 'Piper est à côté d’Oscar.',
-          ),
-          AdjacentConstraint(
-            id: '4',
             a: 'nora',
-            b: 'quentin',
-            description: 'Quentin est à côté de Nora.',
+            b: 'oscar',
+            description: 'Oscar est à côté de Nora.',
           ),
-          AfterConstraint(
-            id: '5',
-            a: 'rose',
+          SameColConstraint(
+            id: '4',
+            a: 'piper',
             b: 'quentin',
-            description: 'Rose est après Quentin.',
+            description: 'Piper et Quentin sont dans la même colonne.',
+          ),
+          BeforeConstraint(
+            id: '5',
+            a: 'piper',
+            b: 'quentin',
+            description: 'Piper est avant Quentin.',
+          ),
+          DistanceAtMostConstraint(
+            id: '6',
+            a: 'rose',
+            b: 'nora',
+            maxDistance: 2,
+            description: 'Rose est à distance ≤ 2 de Nora.',
           ),
           NotAdjacentConstraint(
-            id: '6',
+            id: '7',
             a: 'nora',
             b: 'rose',
             description: 'Nora n’est pas à côté de Rose.',
           ),
         ],
         referenceSolution: {
-          'oscar': 0,
+          'nora': 0,
           'piper': 1,
-          'nora': 2,
-          'quentin': 3,
-          'rose': 4,
+          'rose': 2,
+          'oscar': 3,
+          'quentin': 4,
         },
       );
 
-  static Puzzle _p08() => Puzzle(
+  /// 2×3 — seats 0,1 / 2,3
+  static Puzzle _p08() => _gridPuzzle(
         id: 'office_meeting',
         title: 'Réunion d’équipe',
         description: 'Quatre collègues s’assoient autour de la table.',
@@ -429,43 +493,52 @@ class PuzzleCatalog {
           _c('ugo', 'Ugo'),
           _c('vera', 'Vera'),
         ],
-        positions: _row(4),
+        layout: const [
+          '.T.',
+          '.#.',
+        ],
         constraints: [
           FixedPositionConstraint(
             id: '1',
             characterId: 'sam',
             index: 0,
-            description: 'Sam est à la place 1.',
+            description: 'Sam est à gauche de la table.',
+          ),
+          NearObjectConstraint(
+            id: '2',
+            characterId: 'sam',
+            objectId: 'table',
+            description: 'Sam est près de la table.',
           ),
           AdjacentConstraint(
-            id: '2',
+            id: '3',
             a: 'sam',
             b: 'tina',
             description: 'Tina est à côté de Sam.',
           ),
+          SameColConstraint(
+            id: '4',
+            a: 'ugo',
+            b: 'vera',
+            description: 'Ugo et Vera sont dans la même colonne.',
+          ),
           BeforeConstraint(
-            id: '3',
+            id: '5',
             a: 'ugo',
             b: 'vera',
             description: 'Ugo est avant Vera.',
           ),
-          NotAdjacentConstraint(
-            id: '4',
-            a: 'tina',
-            b: 'vera',
-            description: 'Tina n’est pas à côté de Vera.',
-          ),
         ],
-        // Sam0 Tina1 Ugo2 Vera3 — Tina not adj Vera: 1 and 3 OK
         referenceSolution: {
           'sam': 0,
-          'tina': 1,
-          'ugo': 2,
+          'ugo': 1,
+          'tina': 2,
           'vera': 3,
         },
       );
 
-  static Puzzle _p09() => Puzzle(
+  /// 2×4 — seats 0,1 / 2,3,4,5
+  static Puzzle _p09() => _gridPuzzle(
         id: 'office_desks',
         title: 'Open space',
         description: 'Six collègues choisissent leur bureau.',
@@ -479,62 +552,81 @@ class PuzzleCatalog {
           _c('eric', 'Éric'),
           _c('fay', 'Fay'),
         ],
-        positions: _row(6),
+        layout: const [
+          'W..D',
+          '....',
+        ],
         constraints: [
           FixedPositionConstraint(
             id: '1',
             characterId: 'alex',
             index: 0,
-            description: 'Alex est au bureau 1.',
+            description: 'Alex est près de la fenêtre (place 1).',
           ),
-          SameSideConstraint(
+          NearObjectConstraint(
             id: '2',
+            characterId: 'alex',
+            objectId: 'window',
+            description: 'Alex est près de la fenêtre.',
+          ),
+          FixedPositionConstraint(
+            id: '3',
+            characterId: 'fay',
+            index: 1,
+            description: 'Fay est près de la porte (place 2).',
+          ),
+          NearObjectConstraint(
+            id: '4',
+            characterId: 'fay',
+            objectId: 'door',
+            description: 'Fay est près de la porte.',
+          ),
+          SameColConstraint(
+            id: '5',
             a: 'alex',
             b: 'bella',
-            seatCount: 6,
-            description: 'Alex et Bella sont du même côté.',
+            description: 'Alex et Bella sont dans la même colonne.',
           ),
           DifferentSideConstraint(
-            id: '3',
+            id: '6',
             a: 'chris',
             b: 'diana',
             seatCount: 6,
             description: 'Chris et Diana sont de côtés opposés.',
           ),
           AdjacentConstraint(
-            id: '4',
+            id: '7',
             a: 'bella',
             b: 'chris',
             description: 'Chris est à côté de Bella.',
           ),
-          BetweenConstraint(
-            id: '5',
-            middle: 'diana',
-            left: 'chris',
-            right: 'eric',
-            description: 'Diana est entre Chris et Éric.',
-          ),
-          AfterConstraint(
-            id: '6',
-            a: 'fay',
+          DistanceAtMostConstraint(
+            id: '8',
+            a: 'diana',
             b: 'eric',
-            description: 'Fay est après Éric.',
+            maxDistance: 1,
+            description: 'Diana et Éric sont voisins.',
+          ),
+          BeforeConstraint(
+            id: '9',
+            a: 'diana',
+            b: 'eric',
+            description: 'Diana est avant Éric.',
           ),
         ],
-        // left 0,1,2 / right 3,4,5
-        // Alex0 Bella1 (same left) Chris2 (adj Bella) — Chris left so Diana right.
-        // Diana between Chris and Eric: Chris=2, Diana=3, Eric=4, Fay=5
+        // Alex0 Bella3 (same col). Chris2. Diana4 Eric5.
         referenceSolution: {
           'alex': 0,
-          'bella': 1,
+          'fay': 1,
           'chris': 2,
-          'diana': 3,
-          'eric': 4,
-          'fay': 5,
+          'bella': 3,
+          'diana': 4,
+          'eric': 5,
         },
       );
 
-  static Puzzle _p10() => Puzzle(
+  /// Row under screen — seats 0..4
+  static Puzzle _p10() => _gridPuzzle(
         id: 'cinema_row',
         title: 'Rangée de cinéma',
         description: 'Cinq amis choisissent leurs sièges.',
@@ -547,7 +639,9 @@ class PuzzleCatalog {
           _c('will', 'Will'),
           _c('vik', 'Vik'),
         ],
-        positions: _row(5),
+        layout: const [
+          'S.....',
+        ],
         constraints: [
           FixedPositionConstraint(
             id: '1',
@@ -561,27 +655,27 @@ class PuzzleCatalog {
             b: 'yan',
             description: 'Yan est à côté de Zoé.',
           ),
-          BeforeConstraint(
-            id: '3',
-            a: 'xena',
-            b: 'yan',
-            description: 'Xena est avant Yan.',
-          ),
           BetweenConstraint(
-            id: '4',
+            id: '3',
             middle: 'will',
             left: 'xena',
             right: 'yan',
             description: 'Will est entre Xena et Yan.',
           ),
           AdjacentConstraint(
-            id: '5',
+            id: '4',
             a: 'xena',
             b: 'vik',
             description: 'Vik est à côté de Xena.',
           ),
+          NearObjectConstraint(
+            id: '5',
+            characterId: 'vik',
+            objectId: 'screen',
+            description: 'Vik est près de l’écran.',
+          ),
         ],
-        // Vik0 Xena1 Will2 Yan3 Zoe4
+        // Seats after S: 0,1,2,3,4. Vik near S→0.
         referenceSolution: {
           'vik': 0,
           'xena': 1,
@@ -591,7 +685,7 @@ class PuzzleCatalog {
         },
       );
 
-  static Puzzle _p11() => Puzzle(
+  static Puzzle _p11() => _gridPuzzle(
         id: 'library_table',
         title: 'Table de bibliothèque',
         description: 'Quatre lecteurs partagent une table.',
@@ -603,13 +697,16 @@ class PuzzleCatalog {
           _c('sara', 'Sara'),
           _c('ron', 'Ron'),
         ],
-        positions: _row(4),
+        layout: const [
+          '.T#',
+          '...',
+        ],
         constraints: [
-          FixedPositionConstraint(
+          NearObjectConstraint(
             id: '1',
             characterId: 'uma',
-            index: 2,
-            description: 'Uma est à la place 3.',
+            objectId: 'table',
+            description: 'Uma est près de la table.',
           ),
           AdjacentConstraint(
             id: '2',
@@ -617,33 +714,32 @@ class PuzzleCatalog {
             b: 'ted',
             description: 'Ted est à côté d’Uma.',
           ),
-          BeforeConstraint(
+          SameRowConstraint(
             id: '3',
             a: 'sara',
-            b: 'uma',
-            description: 'Sara est avant Uma.',
+            b: 'ron',
+            description: 'Sara et Ron sont sur la même rangée.',
           ),
-          AfterConstraint(
+          BeforeConstraint(
             id: '4',
-            a: 'ron',
-            b: 'ted',
-            description: 'Ron est après Ted.',
+            a: 'sara',
+            b: 'ron',
+            description: 'Sara est avant Ron.',
           ),
         ],
-        // Sara0 Ted1 Uma2 Ron3 OR Sara0 Uma2 Ted3 — Ted adj Uma: 1 or 3.
-        // If Ted=3, Ron after Ted impossible. So Ted=1 Ron=3 Sara=0
         referenceSolution: {
-          'sara': 0,
+          'uma': 0,
           'ted': 1,
-          'uma': 2,
+          'sara': 2,
           'ron': 3,
         },
       );
 
-  static Puzzle _p12() => Puzzle(
+  /// 2×3 café — seats 0,1 / 2,3,4
+  static Puzzle _p12() => _gridPuzzle(
         id: 'cafe_counter',
         title: 'Comptoir du café',
-        description: 'Cinq clients font la file.',
+        description: 'Cinq clients s’installent au café.',
         scenario: 'cafe',
         difficulty: PuzzleDifficulty.medium,
         characters: [
@@ -653,51 +749,65 @@ class PuzzleCatalog {
           _c('sofia', 'Sofia'),
           _c('theo', 'Théo'),
         ],
-        positions: _row(5),
+        layout: const [
+          'C..',
+          '...',
+        ],
         constraints: [
           FixedPositionConstraint(
             id: '1',
             characterId: 'pauline',
             index: 0,
-            description: 'Pauline est la première.',
+            description: 'Pauline est près du comptoir (place 1).',
+          ),
+          NearObjectConstraint(
+            id: '2',
+            characterId: 'pauline',
+            objectId: 'counter',
+            description: 'Pauline est près du comptoir.',
           ),
           AdjacentConstraint(
-            id: '2',
+            id: '3',
             a: 'pauline',
             b: 'quent',
-            description: 'Quentin est juste derrière Pauline.',
+            description: 'Quentin est à côté de Pauline.',
           ),
-          BetweenConstraint(
-            id: '3',
-            middle: 'remy',
-            left: 'quent',
-            right: 'theo',
-            description: 'Rémy est entre Quentin et Théo.',
+          SameColConstraint(
+            id: '4',
+            a: 'quent',
+            b: 'theo',
+            description: 'Quentin et Théo sont dans la même colonne.',
+          ),
+          AdjacentConstraint(
+            id: '5',
+            a: 'remy',
+            b: 'theo',
+            description: 'Rémy est à côté de Théo.',
           ),
           BeforeConstraint(
-            id: '4',
-            a: 'sofia',
+            id: '6',
+            a: 'remy',
             b: 'theo',
-            description: 'Sofia est avant Théo.',
+            description: 'Rémy est avant Théo.',
           ),
           NotAdjacentConstraint(
-            id: '5',
+            id: '7',
             a: 'quent',
             b: 'sofia',
             description: 'Quentin n’est pas à côté de Sofia.',
           ),
         ],
-        // P0 Q1 R2 S3 T4 — Quent not adj Sofia: 1 and 3 OK
         referenceSolution: {
           'pauline': 0,
           'quent': 1,
-          'remy': 2,
-          'sofia': 3,
+          'sofia': 2,
+          'remy': 3,
           'theo': 4,
         },
       );
 
-  static Puzzle _p13() => Puzzle(
+  /// 1×4 parc
+  static Puzzle _p13() => _gridPuzzle(
         id: 'park_bench',
         title: 'Banc du parc',
         description: 'Quatre personnes partagent un banc.',
@@ -709,13 +819,15 @@ class PuzzleCatalog {
           _c('olivia', 'Olivia'),
           _c('pierre', 'Pierre'),
         ],
-        positions: _row(4),
+        layout: const [
+          'A....',
+        ],
         constraints: [
-          FixedPositionConstraint(
+          NearObjectConstraint(
             id: '1',
             characterId: 'lucie',
-            index: 0,
-            description: 'Lucie est à gauche.',
+            objectId: 'tree',
+            description: 'Lucie est près de l’arbre.',
           ),
           AdjacentConstraint(
             id: '2',
@@ -735,6 +847,12 @@ class PuzzleCatalog {
             b: 'olivia',
             description: 'Noah est avant Olivia.',
           ),
+          BeforeConstraint(
+            id: '5',
+            a: 'olivia',
+            b: 'pierre',
+            description: 'Olivia est avant Pierre.',
+          ),
         ],
         referenceSolution: {
           'lucie': 0,
@@ -744,10 +862,11 @@ class PuzzleCatalog {
         },
       );
 
-  static Puzzle _p14() => Puzzle(
+  /// 2×4 train — seats 0,1 / 2,3,4,5
+  static Puzzle _p14() => _gridPuzzle(
         id: 'train_carriage',
         title: 'Voiture de train',
-        description: 'Six passagers occupent une banquette.',
+        description: 'Six passagers occupent le compartiment.',
         scenario: 'train',
         difficulty: PuzzleDifficulty.hard,
         characters: [
@@ -758,63 +877,81 @@ class PuzzleCatalog {
           _c('elena', 'Elena'),
           _c('finn', 'Finn'),
         ],
-        positions: _row(6),
+        layout: const [
+          'W..D',
+          '....',
+        ],
         constraints: [
           FixedPositionConstraint(
             id: '1',
             characterId: 'aria',
             index: 5,
-            description: 'Aria est à la place 6.',
+            description: 'Aria est près de la porte (place 6).',
+          ),
+          NearObjectConstraint(
+            id: '2',
+            characterId: 'aria',
+            objectId: 'door',
+            description: 'Aria est près de la porte.',
           ),
           AdjacentConstraint(
-            id: '2',
+            id: '3',
             a: 'aria',
             b: 'bruno',
             description: 'Bruno est à côté d’Aria.',
           ),
-          BeforeConstraint(
-            id: '3',
-            a: 'celia',
-            b: 'bruno',
-            description: 'Célia est avant Bruno.',
+          NearObjectConstraint(
+            id: '4',
+            characterId: 'celia',
+            objectId: 'window',
+            description: 'Célia est près de la fenêtre.',
           ),
           BetweenConstraint(
-            id: '4',
+            id: '5',
             middle: 'diego',
             left: 'celia',
             right: 'bruno',
             description: 'Diego est entre Célia et Bruno.',
           ),
+          SameRowConstraint(
+            id: '6',
+            a: 'celia',
+            b: 'bruno',
+            description: 'Célia et Bruno sont sur la même rangée.',
+          ),
           SameSideConstraint(
-            id: '5',
+            id: '7',
             a: 'celia',
             b: 'elena',
             seatCount: 6,
             description: 'Célia et Elena sont du même côté.',
           ),
-          DifferentSideConstraint(
-            id: '6',
-            a: 'finn',
-            b: 'bruno',
-            seatCount: 6,
-            description: 'Finn et Bruno sont de côtés opposés.',
+          BeforeConstraint(
+            id: '8',
+            a: 'elena',
+            b: 'finn',
+            description: 'Elena est avant Finn.',
+          ),
+          NotNearObjectConstraint(
+            id: '9',
+            characterId: 'finn',
+            objectId: 'window',
+            description: 'Finn n’est pas près de la fenêtre.',
           ),
         ],
-        // Aria5 Bruno4. Célia before Bruno, Diego between. Célia left (0,1,2), Elena same left.
-        // Bruno right (4) so Finn left. 
-        // C0 E1 D2 ? F3 B4 A5 — Diego between C and B: between 0 and 4 → 1,2,3. If D=2 OK. Finn=3 left? left<3 so 0,1,2 — Finn at 3 is RIGHT. Fail.
-        // C0 E1 F2 D3 B4 A5 — Diego between 0 and 4: 3 OK. Finn=2 left, Bruno=4 right OK. Célia&Elena left OK.
+        // Aria5 Bruno4 Célia2 Diego3 Elena0 Finn1
         referenceSolution: {
-          'celia': 0,
-          'elena': 1,
-          'finn': 2,
+          'elena': 0,
+          'finn': 1,
+          'celia': 2,
           'diego': 3,
           'bruno': 4,
           'aria': 5,
         },
       );
 
-  static Puzzle _p15() => Puzzle(
+  /// 2×3 dîner — seats 0,1 / 2,3,4
+  static Puzzle _p15() => _gridPuzzle(
         id: 'dinner_table',
         title: 'Dîner entre amis',
         description: 'Cinq convives s’installent à table.',
@@ -827,52 +964,61 @@ class PuzzleCatalog {
           _c('gabriel', 'Gabriel'),
           _c('hannah', 'Hannah'),
         ],
-        positions: _row(5),
+        layout: const [
+          '.T.',
+          '...',
+        ],
         constraints: [
           FixedPositionConstraint(
             id: '1',
             characterId: 'chloe',
-            index: 2,
-            description: 'Chloé est au centre.',
+            index: 0,
+            description: 'Chloé est à gauche de la table.',
+          ),
+          NearObjectConstraint(
+            id: '2',
+            characterId: 'chloe',
+            objectId: 'table',
+            description: 'Chloé est près de la table.',
           ),
           AdjacentConstraint(
-            id: '2',
+            id: '3',
             a: 'chloe',
             b: 'dylan',
             description: 'Dylan est à côté de Chloé.',
           ),
-          BeforeConstraint(
-            id: '3',
-            a: 'eva',
-            b: 'chloe',
-            description: 'Eva est avant Chloé.',
-          ),
-          AfterConstraint(
+          SameRowConstraint(
             id: '4',
-            a: 'hannah',
+            a: 'eva',
             b: 'gabriel',
-            description: 'Hannah est après Gabriel.',
+            description: 'Eva et Gabriel sont sur la même rangée.',
+          ),
+          BeforeConstraint(
+            id: '5',
+            a: 'eva',
+            b: 'gabriel',
+            description: 'Eva est avant Gabriel.',
           ),
           NotAdjacentConstraint(
-            id: '5',
+            id: '6',
             a: 'dylan',
             b: 'gabriel',
             description: 'Dylan n’est pas à côté de Gabriel.',
           ),
-          AdjacentConstraint(
-            id: '6',
-            a: 'eva',
-            b: 'gabriel',
-            description: 'Gabriel est à côté d’Eva.',
+          NearObjectConstraint(
+            id: '7',
+            characterId: 'hannah',
+            objectId: 'table',
+            description: 'Hannah est près de la table.',
           ),
         ],
-        // Eva0 Gabriel1 Chloe2 Dylan3 Hannah4 — Dylan adj Chloe (3), not adj Gabriel (1) OK
+        // Chloe0 Dylan2 Eva3 Gabriel4 Hannah1
         referenceSolution: {
-          'eva': 0,
-          'gabriel': 1,
-          'chloe': 2,
-          'dylan': 3,
-          'hannah': 4,
+          'chloe': 0,
+          'hannah': 1,
+          'dylan': 2,
+          'eva': 3,
+          'gabriel': 4,
         },
       );
 }

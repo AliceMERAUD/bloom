@@ -1,6 +1,8 @@
 import 'package:hive_flutter/hive_flutter.dart';
 
 import '../models/app_settings.dart';
+import '../models/sport_activity.dart';
+import '../models/sport_bag_item.dart';
 import '../models/task.dart';
 import '../models/wellbeing_entry.dart';
 import '../models/workout_session.dart';
@@ -14,6 +16,8 @@ class StorageService {
   static const String puzzleProgressBoxName = 'puzzle_progress';
   static const String settingsBoxName = 'app_settings';
   static const String tasksBoxName = 'tasks';
+  static const String sportActivitiesBoxName = 'sport_activities';
+  static const String sportBagBoxName = 'sport_bag';
 
   static Future<void> init() async {
     await Hive.initFlutter();
@@ -23,6 +27,8 @@ class StorageService {
     await Hive.openBox(puzzleProgressBoxName);
     await Hive.openBox(settingsBoxName);
     await Hive.openBox(tasksBoxName);
+    await Hive.openBox(sportActivitiesBoxName);
+    await Hive.openBox(sportBagBoxName);
   }
 
   /// Initialise Hive avec un chemin local (tests unitaires).
@@ -39,6 +45,8 @@ class StorageService {
     await Hive.openBox(puzzleProgressBoxName);
     await Hive.openBox(settingsBoxName);
     await Hive.openBox(tasksBoxName);
+    await Hive.openBox(sportActivitiesBoxName);
+    await Hive.openBox(sportBagBoxName);
   }
 
   static Future<void> closeForTesting() async {
@@ -51,6 +59,8 @@ class StorageService {
   static Box get _puzzleBox => Hive.box(puzzleProgressBoxName);
   static Box get _settingsBox => Hive.box(settingsBoxName);
   static Box get _tasksBox => Hive.box(tasksBoxName);
+  static Box get _sportActivitiesBox => Hive.box(sportActivitiesBoxName);
+  static Box get _sportBagBox => Hive.box(sportBagBoxName);
 
   static Future<String> saveWorkoutSet(WorkoutSet workoutSet) async {
     final id = DateTime.now().microsecondsSinceEpoch.toString();
@@ -253,6 +263,8 @@ class StorageService {
     await _wellbeingBox.clear();
     await _puzzleBox.clear();
     await _tasksBox.clear();
+    await _sportActivitiesBox.clear();
+    await _sportBagBox.clear();
     if (!keepSettings) {
       await _settingsBox.clear();
     }
@@ -293,5 +305,58 @@ class StorageService {
 
   static Future<void> deleteTask(String id) async {
     await _tasksBox.delete(id);
+  }
+
+  // --- Sport activities ---
+
+  static Future<void> saveSportActivity(SportActivity activity) async {
+    await _sportActivitiesBox.put(activity.id, activity.toMap());
+  }
+
+  static SportActivity? getSportActivity(String id) {
+    final raw = _sportActivitiesBox.get(id);
+    if (raw is Map) return SportActivity.fromMap(raw);
+    return null;
+  }
+
+  static List<SportActivity> getAllSportActivities() {
+    final list = _sportActivitiesBox.values
+        .whereType<Map>()
+        .map(SportActivity.fromMap)
+        .toList();
+    list.sort((a, b) {
+      if (a.builtin != b.builtin) return a.builtin ? -1 : 1;
+      return a.name.toLowerCase().compareTo(b.name.toLowerCase());
+    });
+    return list;
+  }
+
+  static Future<void> deleteSportActivity(String id) async {
+    await _sportActivitiesBox.delete(id);
+  }
+
+  // --- Sport bag ---
+
+  static Future<void> saveBagItem(SportBagItem item) async {
+    await _sportBagBox.put(item.id, item.toMap());
+  }
+
+  static SportBagItem? getBagItem(String id) {
+    final raw = _sportBagBox.get(id);
+    if (raw is Map) return SportBagItem.fromMap(raw);
+    return null;
+  }
+
+  static List<SportBagItem> getAllBagItems() {
+    final list = _sportBagBox.values
+        .whereType<Map>()
+        .map(SportBagItem.fromMap)
+        .toList();
+    list.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+    return list;
+  }
+
+  static Future<void> deleteBagItem(String id) async {
+    await _sportBagBox.delete(id);
   }
 }

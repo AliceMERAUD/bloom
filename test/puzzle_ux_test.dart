@@ -173,13 +173,18 @@ void main() {
 
   testWidgets('mauvaise solution conserve le placement', (tester) async {
     await pumpPlay(tester);
+    final puzzle = PuzzleCatalog.byId('bus_friends');
     final state = playState(tester);
-    state.placement = const PuzzlePlacement({
-      'dana': 0,
-      'charlie': 1,
-      'bob': 2,
-      'alice': 3,
-    });
+    // Swap two characters from the reference so the placement stays wrong
+    // even if the catalog solution changes.
+    final wrong = Map<String, int>.from(puzzle.referenceSolution);
+    final keys = wrong.keys.toList();
+    final a = keys[0];
+    final b = keys[1];
+    final tmp = wrong[a]!;
+    wrong[a] = wrong[b]!;
+    wrong[b] = tmp;
+    state.placement = PuzzlePlacement(wrong);
     await tester.pump();
 
     state.debugVerify(showSuccessDialog: true);
@@ -188,7 +193,7 @@ void main() {
     expect(state.solved, isFalse);
     expect(find.text('Bravo !'), findsNothing);
     expect(find.text('Non respectée'), findsWidgets);
-    expect(state.placement.seats.length, 4);
+    expect(state.placement.seats.length, puzzle.seatCount);
   });
 
   testWidgets('PuzzleScreen liste scénarios et ouvre un puzzle', (tester) async {

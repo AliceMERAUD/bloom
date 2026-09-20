@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../models/puzzle/puzzle.dart';
 import '../../models/puzzle/puzzle_models.dart';
 import '../../models/puzzle/puzzle_scene.dart';
+import '../../services/bloom_refresh.dart';
 import '../../services/puzzle_catalog.dart';
 import '../../services/puzzle_progress_service.dart';
 import '../../widgets/puzzle/puzzle_character_widget.dart';
@@ -31,6 +32,7 @@ class PuzzlePlayScreenState extends State<PuzzlePlayScreen> {
   String? selectedCharacterId;
   PuzzleValidationResult? lastResult;
   bool solved = false;
+  int _hintLevel = 0;
 
   @override
   void initState() {
@@ -114,10 +116,39 @@ class PuzzlePlayScreenState extends State<PuzzlePlayScreen> {
       selectedCharacterId = null;
       lastResult = null;
       solved = false;
+      _hintLevel = 0;
     });
     if (!suppressPersistence) {
       PuzzleProgressService.clearPlacement(puzzle.id);
     }
+  }
+
+  void _showHint() {
+    final message =
+        PuzzleHintService.describeHint(puzzle, placement, _hintLevel);
+
+    if (_hintLevel >= 2) {
+      final revealed =
+          PuzzleHintService.applyRevealHint(puzzle, placement);
+      if (revealed != null) {
+        setState(() {
+          placement = revealed;
+          selectedCharacterId = null;
+          lastResult = null;
+          solved = false;
+        });
+        _schedulePersist();
+      }
+    }
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
+
+    setState(() {
+      _hintLevel = (_hintLevel + 1) % 3;
+    });
   }
 
   void _verify({bool showSuccessDialog = true}) {
@@ -134,6 +165,7 @@ class PuzzlePlayScreenState extends State<PuzzlePlayScreen> {
     if (result.isSolved) {
       if (!suppressPersistence) {
         PuzzleProgressService.markCompleted(puzzle.id);
+        BloomRefresh.notify();
       }
       if (!mounted || !showSuccessDialog) return;
       showDialog<void>(
@@ -159,6 +191,15 @@ class PuzzlePlayScreenState extends State<PuzzlePlayScreen> {
         const SnackBar(
           content: Text('Place tous les personnages avant de valider.'),
         ),
+      );
+    } else {
+      if (!mounted) return;
+      final failed = result.failedConstraints;
+      final text = failed.isEmpty
+          ? 'Incorrect'
+          : failed.map((c) => c.description).join('\n');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(text)),
       );
     }
   }
@@ -203,6 +244,11 @@ class PuzzlePlayScreenState extends State<PuzzlePlayScreen> {
       appBar: AppBar(
         title: Text(puzzle.title),
         actions: [
+          IconButton(
+            tooltip: 'Indice',
+            icon: const Icon(Icons.lightbulb_outline),
+            onPressed: solved ? null : _showHint,
+          ),
           Padding(
             padding: const EdgeInsets.only(right: 12),
             child: Center(
