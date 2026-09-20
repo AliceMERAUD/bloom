@@ -4,8 +4,11 @@ import '../../app/theme.dart';
 import '../../models/wellbeing_enums.dart';
 import '../../services/bloom_refresh.dart';
 import '../../services/dashboard_service.dart';
+import '../../services/google_calendar/google_calendar_service.dart';
+import '../../services/settings_service.dart';
 import '../../services/workout_session_service.dart';
 import '../../widgets/common/bloom_widgets.dart';
+import '../settings/settings_screen.dart';
 
 /// Personalized local-first home dashboard.
 class HomeScreen extends StatefulWidget {
@@ -13,6 +16,7 @@ class HomeScreen extends StatefulWidget {
   final VoidCallback? onOpenWellbeing;
   final VoidCallback? onOpenTasks;
   final VoidCallback? onOpenPuzzle;
+  final VoidCallback? onOpenGoogleCalendar;
   final VoidCallback? onOpenSettings;
   final VoidCallback? onAddTask;
   final VoidCallback? onAddWellbeing;
@@ -25,6 +29,7 @@ class HomeScreen extends StatefulWidget {
     this.onOpenWellbeing,
     this.onOpenTasks,
     this.onOpenPuzzle,
+    this.onOpenGoogleCalendar,
     this.onOpenSettings,
     this.onAddTask,
     this.onAddWellbeing,
@@ -110,6 +115,16 @@ class _HomeScreenState extends State<HomeScreen> {
                   onOpenWellbeing: widget.onOpenWellbeing,
                   onOpenSport: widget.onOpenSport,
                   onOpenPuzzle: widget.onOpenPuzzle,
+                ),
+              ),
+              const SizedBox(height: 20),
+              BloomSection(
+                title: 'Google Calendar',
+                icon: Icons.calendar_month,
+                accent: BloomTheme.planning,
+                child: _GoogleCalendarCard(
+                  onOpenSettings:
+                      widget.onOpenGoogleCalendar ?? widget.onOpenSettings,
                 ),
               ),
               const SizedBox(height: 20),
@@ -356,6 +371,77 @@ class _TodayCard extends StatelessWidget {
               ),
             ),
           ],
+        ],
+      ),
+    );
+  }
+}
+
+class _GoogleCalendarCard extends StatelessWidget {
+  final VoidCallback? onOpenSettings;
+
+  const _GoogleCalendarCard({this.onOpenSettings});
+
+  Future<void> _openSettings(BuildContext context) async {
+    if (onOpenSettings != null) {
+      onOpenSettings!();
+      return;
+    }
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const SettingsScreen()),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final prefs = SettingsService.current.googleCalendar;
+    final email = prefs.accountEmail;
+
+    if (email == null) {
+      return BloomEmptyState(
+        icon: Icons.calendar_month_outlined,
+        accent: BloomTheme.planning,
+        message: 'Connecte Google Calendar pour synchroniser tes tâches',
+        actionLabel: 'Connecter',
+        onAction: () => _openSettings(context),
+      );
+    }
+
+    final calendarName = prefs.selectedCalendarName ?? 'Calendrier';
+
+    return BloomCard(
+      accent: BloomTheme.planning,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Connecté',
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 4),
+          Text(email, style: Theme.of(context).textTheme.bodyMedium),
+          const SizedBox(height: 4),
+          Text(
+            calendarName,
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              FilledButton.tonalIcon(
+                onPressed: () => GoogleCalendarService.openGoogleCalendarApp(),
+                icon: const Icon(Icons.open_in_new, size: 18),
+                label: const Text('Ouvrir Google Calendar'),
+              ),
+              OutlinedButton.icon(
+                onPressed: () => _openSettings(context),
+                icon: const Icon(Icons.settings_outlined, size: 18),
+                label: const Text('Paramètres'),
+              ),
+            ],
+          ),
         ],
       ),
     );

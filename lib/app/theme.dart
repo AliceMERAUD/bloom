@@ -8,6 +8,8 @@ class BloomTheme {
   static const Color wellbeing = Color(0xFFD4849A);
   static const Color tasks = Color(0xFF5B8DEF);
   static const Color puzzle = Color(0xFF9B7EDE);
+  /// Neutral Bloom accent for Planning chrome (event colors stay typed).
+  static const Color planning = Color(0xFF5A8F7B);
   static const Color scaffoldLight = Color(0xFFF3F9F5);
   static const Color scaffoldDark = Color(0xFF101814);
 

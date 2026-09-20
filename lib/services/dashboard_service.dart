@@ -6,6 +6,7 @@ import '../models/workout_set.dart';
 import 'exercise_service.dart';
 import 'puzzle_catalog.dart';
 import 'puzzle_progress_service.dart';
+import 'settings_service.dart';
 import 'sport_activity_service.dart';
 import 'storage_service.dart';
 import 'task_service.dart';
@@ -40,6 +41,8 @@ class DashboardSnapshot {
   final String? nextSportName;
   final TractionProgressSummary? tractionProgress;
   final String motivationalLine;
+  final String? googleCalendarEmail;
+  final String? googleCalendarName;
 
   const DashboardSnapshot({
     required this.closedSessionCount,
@@ -68,6 +71,8 @@ class DashboardSnapshot {
     required this.nextSportName,
     required this.tractionProgress,
     required this.motivationalLine,
+    required this.googleCalendarEmail,
+    required this.googleCalendarName,
   });
 
   bool get hasSportHistory => closedSessionCount > 0 || openSession != null;
@@ -109,6 +114,7 @@ class DashboardService {
     final entries = WellbeingService.getAllEntries();
     final progress = PuzzleProgressService.load();
     final nextId = progress.nextPlayableId;
+    final gcal = SettingsService.current.googleCalendar;
 
     final pending = TaskService.getPendingTasks();
     final dueFirst = [
@@ -178,6 +184,8 @@ class DashboardService {
         puzzleTotal: PuzzleCatalog.all.length,
         hasWellbeing: today != null,
       ),
+      googleCalendarEmail: gcal.accountEmail,
+      googleCalendarName: gcal.selectedCalendarName,
     );
   }
 
