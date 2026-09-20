@@ -28,15 +28,8 @@ class _SportBagScreenState extends State<SportBagScreen> {
   }
 
   void _reload() {
-    final all = SportBagService.getAll();
     setState(() {
-      if (_filterSportId == null) {
-        _items = all;
-      } else if (_filterSportId!.isEmpty) {
-        _items = all.where((i) => i.sportId == null).toList();
-      } else {
-        _items = all.where((i) => i.sportId == _filterSportId).toList();
-      }
+      _items = SportBagService.itemsForFilter(_filterSportId);
     });
   }
 

@@ -214,6 +214,14 @@ class TaskService {
       return;
     }
 
+    if (task.sportId != null) {
+      final sport = SportActivityService.getById(task.sportId!);
+      if (sport != null && !sport.notificationEnabled) {
+        await ReminderService.cancelId(task.reminderId!);
+        return;
+      }
+    }
+
     final when = _reminderDateTime(task);
     if (when == null || when.isBefore(DateTime.now())) {
       return;
@@ -241,16 +249,22 @@ class TaskService {
     final hasBag = task.sportId != null &&
         SportBagService.checklistFor(task.sportId).isNotEmpty;
 
-    if (sport != null || task.category == TaskCategory.sport) {
-      final name = sport?.name ?? task.title;
-      final title = 'Bloom — Sport';
+    if (sport != null) {
+      return (
+        'Bloom — ${sport.name}',
+        sport.resolvedNotificationBody(includeBagHint: hasBag),
+      );
+    }
+
+    if (task.category == TaskCategory.sport) {
+      final name = task.title;
       final lead = task.reminderMinutesBefore > 0
           ? 'dans ${task.reminderMinutesBefore} min'
           : 'c’est l’heure';
       final body = hasBag
-          ? '🏊 $name $lead — pense à ton sac !'
-          : '🏊 C’est bientôt l’heure de $name !';
-      return (title, body);
+          ? '🏅 $name $lead — pense à ton sac !'
+          : '🏅 C’est bientôt l’heure de $name !';
+      return ('Bloom — Sport', body);
     }
 
     return ('Bloom — Tâche', task.title);
@@ -267,7 +281,15 @@ class TaskService {
       hour,
       minute,
     );
-    return due.subtract(Duration(minutes: task.reminderMinutesBefore));
+
+    var lead = task.reminderMinutesBefore;
+    if (task.sportId != null) {
+      final sport = SportActivityService.getById(task.sportId!);
+      if (sport != null) {
+        lead = sport.notificationMinutesBefore;
+      }
+    }
+    return due.subtract(Duration(minutes: lead));
   }
 
   /// Exposed for unit tests.

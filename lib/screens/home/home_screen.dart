@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../app/theme.dart';
 import '../../models/wellbeing_enums.dart';
 import '../../services/bloom_refresh.dart';
 import '../../services/dashboard_service.dart';
@@ -93,6 +94,8 @@ class _HomeScreenState extends State<HomeScreen> {
               const SizedBox(height: 20),
               BloomSection(
                 title: 'Sport',
+                icon: Icons.fitness_center,
+                accent: BloomTheme.sport,
                 child: _SportCard(
                   data: data,
                   onOpen: widget.onOpenSport,
@@ -101,6 +104,8 @@ class _HomeScreenState extends State<HomeScreen> {
               const SizedBox(height: 20),
               BloomSection(
                 title: 'Bien-être',
+                icon: Icons.favorite,
+                accent: BloomTheme.wellbeing,
                 child: _WellbeingCard(
                   data: data,
                   onOpen: widget.onOpenWellbeing,
@@ -109,6 +114,8 @@ class _HomeScreenState extends State<HomeScreen> {
               const SizedBox(height: 20),
               BloomSection(
                 title: 'Tasks',
+                icon: Icons.checklist,
+                accent: BloomTheme.tasks,
                 child: _TasksCard(
                   data: data,
                   onOpen: widget.onOpenTasks,
@@ -117,6 +124,8 @@ class _HomeScreenState extends State<HomeScreen> {
               const SizedBox(height: 20),
               BloomSection(
                 title: 'Puzzle',
+                icon: Icons.extension,
+                accent: BloomTheme.puzzle,
                 child: _PuzzleCard(
                   data: data,
                   onOpen: widget.onOpenPuzzle,

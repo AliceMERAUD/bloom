@@ -11,11 +11,25 @@ class SportBagService {
   static List<SportBagItem> getForSport(String sportId) =>
       getAll().where((i) => i.sportId == sportId).toList();
 
-  /// General items + sport-specific items for a checklist.
   static List<SportBagItem> checklistFor(String? sportId) {
     final general = getGeneral();
-    if (sportId == null) return general;
-    return [...general, ...getForSport(sportId)];
+    if (sportId == null || sportId.isEmpty) return general;
+    final specific = getForSport(sportId);
+    // Merge without duplicating ids (generals stay general in storage).
+    final seen = <String>{};
+    final merged = <SportBagItem>[];
+    for (final item in [...general, ...specific]) {
+      if (seen.add(item.id)) merged.add(item);
+    }
+    return merged;
+  }
+
+  /// Items shown in the bag management screen for a filter chip.
+  /// Sport filter = general + that sport (not sport-only).
+  static List<SportBagItem> itemsForFilter(String? filterSportId) {
+    if (filterSportId == null) return getAll();
+    if (filterSportId.isEmpty) return getGeneral();
+    return checklistFor(filterSportId);
   }
 
   static Future<SportBagItem> add({

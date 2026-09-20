@@ -16,7 +16,11 @@ class SportActivityFormScreen extends StatefulWidget {
 class _SportActivityFormScreenState extends State<SportActivityFormScreen> {
   final _nameController = TextEditingController();
   final _descriptionController = TextEditingController();
+  final _notifMessageController = TextEditingController();
+  final _bagMessageController = TextEditingController();
   String _iconName = 'sports';
+  bool _notificationEnabled = true;
+  int _minutesBefore = 30;
   bool _saving = false;
 
   bool get _isEditing => widget.activity != null;
@@ -29,6 +33,10 @@ class _SportActivityFormScreenState extends State<SportActivityFormScreen> {
       _nameController.text = activity.name;
       _descriptionController.text = activity.description ?? '';
       _iconName = activity.iconName;
+      _notificationEnabled = activity.notificationEnabled;
+      _minutesBefore = activity.notificationMinutesBefore;
+      _notifMessageController.text = activity.notificationMessage ?? '';
+      _bagMessageController.text = activity.notificationBagMessage ?? '';
     }
   }
 
@@ -36,6 +44,8 @@ class _SportActivityFormScreenState extends State<SportActivityFormScreen> {
   void dispose() {
     _nameController.dispose();
     _descriptionController.dispose();
+    _notifMessageController.dispose();
+    _bagMessageController.dispose();
     super.dispose();
   }
 
@@ -50,6 +60,8 @@ class _SportActivityFormScreenState extends State<SportActivityFormScreen> {
 
     setState(() => _saving = true);
     try {
+      final notifMsg = _notifMessageController.text.trim();
+      final bagMsg = _bagMessageController.text.trim();
       if (_isEditing) {
         await SportActivityService.update(
           widget.activity!.copyWith(
@@ -59,15 +71,31 @@ class _SportActivityFormScreenState extends State<SportActivityFormScreen> {
                 : _descriptionController.text.trim(),
             clearDescription: _descriptionController.text.trim().isEmpty,
             iconName: _iconName,
+            notificationEnabled: _notificationEnabled,
+            notificationMinutesBefore: _minutesBefore,
+            notificationMessage: notifMsg.isEmpty ? null : notifMsg,
+            clearNotificationMessage: notifMsg.isEmpty,
+            notificationBagMessage: bagMsg.isEmpty ? null : bagMsg,
+            clearNotificationBagMessage: bagMsg.isEmpty,
           ),
         );
       } else {
-        await SportActivityService.add(
+        final created = await SportActivityService.add(
           name: name,
           description: _descriptionController.text.trim().isEmpty
               ? null
               : _descriptionController.text.trim(),
           iconName: _iconName,
+        );
+        await SportActivityService.update(
+          created.copyWith(
+            notificationEnabled: _notificationEnabled,
+            notificationMinutesBefore: _minutesBefore,
+            notificationMessage: notifMsg.isEmpty ? null : notifMsg,
+            clearNotificationMessage: notifMsg.isEmpty,
+            notificationBagMessage: bagMsg.isEmpty ? null : bagMsg,
+            clearNotificationBagMessage: bagMsg.isEmpty,
+          ),
         );
       }
       if (mounted) Navigator.pop(context);
@@ -78,6 +106,23 @@ class _SportActivityFormScreenState extends State<SportActivityFormScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final preview = SportActivity(
+      id: 'preview',
+      name: _nameController.text.trim().isEmpty
+          ? 'Mon sport'
+          : _nameController.text.trim(),
+      iconName: _iconName,
+      createdAt: DateTime.now(),
+      notificationEnabled: _notificationEnabled,
+      notificationMessage: _notifMessageController.text.trim().isEmpty
+          ? null
+          : _notifMessageController.text.trim(),
+      notificationBagMessage: _bagMessageController.text.trim().isEmpty
+          ? null
+          : _bagMessageController.text.trim(),
+      notificationMinutesBefore: _minutesBefore,
+    );
+
     return Scaffold(
       appBar: AppBar(
         title: Text(_isEditing ? 'Modifier le sport' : 'Nouveau sport'),
@@ -88,6 +133,7 @@ class _SportActivityFormScreenState extends State<SportActivityFormScreen> {
           TextField(
             controller: _nameController,
             textCapitalization: TextCapitalization.sentences,
+            onChanged: (_) => setState(() {}),
             decoration: const InputDecoration(
               labelText: 'Nom',
               border: OutlineInputBorder(),
@@ -135,6 +181,75 @@ class _SportActivityFormScreenState extends State<SportActivityFormScreen> {
                 ),
               );
             }).toList(),
+          ),
+          const SizedBox(height: 24),
+          Text(
+            'Notification',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Messages et délai propres à ce sport',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Activer les rappels pour ce sport'),
+            value: _notificationEnabled,
+            onChanged: (v) => setState(() => _notificationEnabled = v),
+          ),
+          Text('Délai', style: Theme.of(context).textTheme.titleSmall),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            children: kSportReminderLeadChoices.map((mins) {
+              final label = mins == 0 ? 'À l’heure' : '$mins min avant';
+              return ChoiceChip(
+                label: Text(label),
+                selected: _minutesBefore == mins,
+                onSelected: _notificationEnabled
+                    ? (_) => setState(() => _minutesBefore = mins)
+                    : null,
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _notifMessageController,
+            enabled: _notificationEnabled,
+            maxLines: 2,
+            onChanged: (_) => setState(() {}),
+            decoration: const InputDecoration(
+              labelText: 'Message personnalisé (optionnel)',
+              hintText: 'Laisse vide pour le message par défaut',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _bagMessageController,
+            enabled: _notificationEnabled,
+            onChanged: (_) => setState(() {}),
+            decoration: const InputDecoration(
+              labelText: 'Rappel sac (optionnel)',
+              hintText: 'ex. Pense à ton maillot !',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Card(
+            color: Theme.of(context).colorScheme.primaryContainer.withValues(
+                  alpha: 0.45,
+                ),
+            child: ListTile(
+              leading: const Icon(Icons.notifications_active_outlined),
+              title: const Text('Aperçu'),
+              subtitle: Text(
+                preview.resolvedNotificationBody(includeBagHint: true),
+              ),
+            ),
           ),
           const SizedBox(height: 24),
           FilledButton(

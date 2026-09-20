@@ -35,15 +35,20 @@ class PuzzleConstraintFeedback extends StatelessWidget {
         } else if (check.satisfied) {
           status = 'Respectée';
           icon = Icons.check_circle;
-          color = Colors.green.shade700;
+          color = const Color(0xFF2E7D4F);
         } else {
           status = 'Non respectée';
           icon = Icons.cancel;
-          color = Colors.red.shade700;
+          color = const Color(0xFFC45C6A);
         }
 
         return Card(
           margin: const EdgeInsets.only(bottom: 6),
+          color: check != null && check.evaluable
+              ? (check.satisfied
+                  ? color.withValues(alpha: 0.08)
+                  : color.withValues(alpha: 0.08))
+              : null,
           child: ListTile(
             dense: true,
             leading: Icon(icon, color: color),
