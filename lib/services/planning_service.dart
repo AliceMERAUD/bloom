@@ -17,6 +17,44 @@ class PlanningService {
     return eventsInRange(key, key);
   }
 
+  /// Calendar strip events excluding plain tasks (shown under « Mes tâches »).
+  static List<PlanningEvent> agendaEventsForDay(DateTime day) {
+    return eventsForDay(day)
+        .where((e) => e.kind != PlanningEventKind.task)
+        .toList();
+  }
+
+  static List<PlanningEvent> agendaEventsInRange(DateTime start, DateTime end) {
+    return eventsInRange(start, end)
+        .where((e) => e.kind != PlanningEventKind.task)
+        .toList();
+  }
+
+  /// Tasks with a due date inside the inclusive range.
+  static List<BloomTask> tasksInRange(DateTime start, DateTime end) {
+    final from = PlanningEvent.dayOnly(start);
+    final to = PlanningEvent.dayOnly(end);
+    final tasks = TaskService.getTasks().where((t) {
+      if (t.dueDate == null) return false;
+      final day = PlanningEvent.dayOnly(t.dueDate!);
+      return !day.isBefore(from) && !day.isAfter(to);
+    }).toList();
+
+    tasks.sort((a, b) {
+      final byDate = a.dueDate!.compareTo(b.dueDate!);
+      if (byDate != 0) return byDate;
+      final at = (a.dueTime?.hour ?? 99) * 60 + (a.dueTime?.minute ?? 0);
+      final bt = (b.dueTime?.hour ?? 99) * 60 + (b.dueTime?.minute ?? 0);
+      if (at != bt) return at.compareTo(bt);
+      return a.title.compareTo(b.title);
+    });
+    return tasks;
+  }
+
+  static List<BloomTask> tasksWithoutDueDate() {
+    return TaskService.getTasks().where((t) => t.dueDate == null).toList();
+  }
+
   /// Inclusive range of calendar days.
   static List<PlanningEvent> eventsInRange(DateTime start, DateTime end) {
     final from = PlanningEvent.dayOnly(start);

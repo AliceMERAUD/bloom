@@ -8,7 +8,6 @@ import 'package:bloom/models/app_settings.dart';
 import 'package:bloom/models/wellbeing_entry.dart';
 import 'package:bloom/models/wellbeing_enums.dart';
 import 'package:bloom/screens/shell/main_shell.dart';
-import 'package:bloom/screens/tasks/tasks_screen.dart';
 import 'package:bloom/services/dashboard_service.dart';
 import 'package:bloom/services/data_export_service.dart';
 import 'package:bloom/services/puzzle_progress_service.dart';
@@ -56,6 +55,7 @@ void main() {
     await tester.tap(find.text('Planning').last);
     await tester.pump();
     expect(find.byType(MainShell), findsOneWidget);
+    expect(find.text('Mes tâches'), findsOneWidget);
 
     await tester.tap(find.text('Sport').last);
     await tester.pump();
@@ -64,17 +64,13 @@ void main() {
     await tester.pump();
 
     await tester.tap(find.text('Plus'));
-    await tester.pumpAndSettle();
-    expect(find.text('Tasks'), findsWidgets);
+    await tester.pump();
     expect(find.text('Puzzle'), findsWidgets);
-    await tester.tap(find.text('Tasks').last);
-    await tester.pumpAndSettle();
-    expect(find.byType(TasksScreen), findsOneWidget);
+    expect(find.text('Paramètres'), findsWidgets);
 
-    // Close Tasks route to return to shell.
-    final navigator = tester.state<NavigatorState>(find.byType(Navigator).first);
-    navigator.pop();
-    await tester.pumpAndSettle();
+    // Dismiss Plus sheet.
+    Navigator.of(tester.element(find.text('Puzzle').first)).pop();
+    await tester.pump();
 
     await tester.tap(find.text('Accueil'));
     await tester.pump();

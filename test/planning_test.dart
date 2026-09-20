@@ -95,11 +95,14 @@ void main() {
       );
       expect(events.any((e) => e.title == 'Sans date'), isFalse);
 
-      // Chronological: session 09:00, laundry 15:00, swim 18:30, period last.
-      expect(events.first.kind, PlanningEventKind.workoutSession);
-      expect(events[1].title, 'Lessive');
-      expect(events[2].title, 'Natation');
-      expect(events.last.kind, PlanningEventKind.period);
+      final agenda = PlanningService.agendaEventsForDay(today);
+      expect(agenda.any((e) => e.kind == PlanningEventKind.task), isFalse);
+      expect(agenda.any((e) => e.kind == PlanningEventKind.period), isTrue);
+
+      final tasks = PlanningService.tasksInRange(today, today);
+      expect(tasks.map((t) => t.title), containsAll(['Lessive', 'Séance piscine']));
+      expect(tasks.any((t) => t.title == 'Sans date'), isFalse);
+      expect(PlanningService.tasksWithoutDueDate().single.title, 'Sans date');
     });
 
     test('récurrence quotidienne : une occurrence active, pas de doublon',
@@ -118,14 +121,14 @@ void main() {
       expect(pending, hasLength(1));
 
       final nextDay = PlanningEvent.dayOnly(pending.single.dueDate!);
-      final dayEvents = PlanningService.eventsForDay(nextDay)
-          .where((e) => e.title == 'Daily')
+      final dayTasks = PlanningService.tasksInRange(nextDay, nextDay)
+          .where((t) => t.title == 'Daily' && !t.completed)
           .toList();
-      expect(dayEvents, hasLength(1));
+      expect(dayTasks, hasLength(1));
 
       final weekEnd = today.add(const Duration(days: 14));
-      final range = PlanningService.eventsInRange(today, weekEnd)
-          .where((e) => e.title == 'Daily' && !e.completed)
+      final range = PlanningService.tasksInRange(today, weekEnd)
+          .where((t) => t.title == 'Daily' && !t.completed)
           .toList();
       expect(range, hasLength(1));
     });
@@ -161,39 +164,49 @@ void main() {
   });
 
   group('Planning UI', () {
-    testWidgets('PlanningScreen modes Jour / Semaine / Mois', (tester) async {
+    testWidgets('PlanningScreen modes + Mes tâches', (tester) async {
+      final today = PlanningEvent.dayOnly(DateTime.now());
+      await tester.runAsync(() async {
+        await TaskService.addTask(title: 'Courses', dueDate: today);
+      });
+
       await tester.pumpWidget(const MaterialApp(home: PlanningScreen()));
       await tester.pump();
 
       expect(find.text('Planning'), findsOneWidget);
-      expect(find.text('Jour'), findsOneWidget);
-      expect(find.text('Aujourd’hui'), findsOneWidget);
+      expect(find.text('Mes tâches'), findsOneWidget);
+      expect(find.text('Courses'), findsOneWidget);
 
       await tester.tap(find.text('Semaine'));
-      await tester.pumpAndSettle();
-      expect(find.text('L'), findsWidgets);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
+      expect(find.text('Tâches de la semaine'), findsOneWidget);
 
-      await tester.tap(find.text('Mois'));
-      await tester.pumpAndSettle();
-      expect(find.textContaining('Sport'), findsWidgets);
+      final monthStart = DateTime(today.year, today.month, 1);
+      final monthEnd = DateTime(today.year, today.month + 1, 0);
+      expect(
+        PlanningService.tasksInRange(monthStart, monthEnd)
+            .any((t) => t.title == 'Courses'),
+        isTrue,
+      );
     });
 
-    testWidgets('MainShell expose Planning et menu Plus', (tester) async {
+    testWidgets('MainShell Planning sans onglet Tasks séparé', (tester) async {
       await tester.pumpWidget(const MaterialApp(home: MainShell()));
       await tester.pump();
 
       expect(find.text('Planning'), findsWidgets);
       expect(find.text('Plus'), findsOneWidget);
-      expect(find.text('Accueil'), findsOneWidget);
 
       await tester.tap(find.text('Planning').last);
-      await tester.pumpAndSettle();
+      await tester.pump(const Duration(milliseconds: 100));
       expect(find.byType(PlanningScreen), findsOneWidget);
+      expect(find.text('Mes tâches'), findsOneWidget);
 
       await tester.tap(find.text('Plus'));
-      await tester.pumpAndSettle();
-      expect(find.text('Tasks'), findsWidgets);
+      await tester.pump(const Duration(milliseconds: 100));
       expect(find.text('Puzzle'), findsWidgets);
+      expect(find.text('Tasks'), findsNothing);
     });
   });
 }

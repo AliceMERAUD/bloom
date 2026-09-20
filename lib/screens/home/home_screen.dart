@@ -116,12 +116,12 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               const SizedBox(height: 20),
               BloomSection(
-                title: 'Planning',
+                title: 'Planning & tâches',
                 icon: Icons.calendar_month,
                 accent: BloomTheme.planning,
                 child: _PlanningCard(
                   data: data,
-                  onOpen: widget.onOpenPlanning,
+                  onOpen: widget.onOpenPlanning ?? widget.onOpenTasks,
                 ),
               ),
               const SizedBox(height: 20),
@@ -398,17 +398,26 @@ class _PlanningCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   count == 0
-                      ? 'Aucun événement aujourd’hui'
+                      ? 'Rien de prévu aujourd’hui'
                       : 'Aujourd’hui : $count événement${count > 1 ? 's' : ''}',
                   style: const TextStyle(fontWeight: FontWeight.w600),
                 ),
               ),
               TextButton(
                 onPressed: onOpen,
-                child: const Text('Voir →'),
+                child: const Text('Ouvrir →'),
               ),
             ],
           ),
+          if (data.dueTodayTaskCount > 0 || data.pendingTaskCount > 0) ...[
+            const SizedBox(height: 6),
+            Text(
+              data.dueTodayTaskCount > 0
+                  ? '${data.dueTodayTaskCount} tâche(s) aujourd’hui'
+                  : '${data.pendingTaskCount} tâche(s) en attente',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+          ],
           if (upcoming.isNotEmpty) ...[
             const SizedBox(height: 8),
             Text(

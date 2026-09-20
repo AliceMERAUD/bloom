@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../app/theme.dart';
 import '../../services/bloom_refresh.dart';
 import '../../services/puzzle_progress_service.dart';
 import '../home/home_screen.dart';
@@ -9,10 +10,8 @@ import '../puzzle/puzzle_screen.dart';
 import '../settings/settings_screen.dart';
 import '../sport/sport_screen.dart';
 import '../tasks/task_form_screen.dart';
-import '../tasks/tasks_screen.dart';
 import '../wellbeing/wellbeing_entry_screen.dart';
 import '../wellbeing/wellbeing_screen.dart';
-import '../../app/theme.dart';
 
 /// Root shell: Accueil / Planning / Sport / Bien-être / Plus.
 class MainShell extends StatefulWidget {
@@ -51,13 +50,6 @@ class MainShellState extends State<MainShell> {
     await _sportKey.currentState?.startSessionFromShortcut();
   }
 
-  Future<void> _openTasks() async {
-    await Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const TasksScreen()),
-    );
-    BloomRefresh.notify();
-  }
-
   Future<void> _openPuzzle() async {
     await Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => const PuzzleScreen()),
@@ -75,11 +67,6 @@ class MainShellState extends State<MainShell> {
             mainAxisSize: MainAxisSize.min,
             children: [
               ListTile(
-                leading: Icon(Icons.checklist, color: BloomTheme.tasks),
-                title: const Text('Tasks'),
-                onTap: () => Navigator.pop(ctx, 'tasks'),
-              ),
-              ListTile(
                 leading: Icon(Icons.extension, color: BloomTheme.puzzle),
                 title: const Text('Puzzle'),
                 onTap: () => Navigator.pop(ctx, 'puzzle'),
@@ -96,8 +83,6 @@ class MainShellState extends State<MainShell> {
     );
     if (!mounted || choice == null) return;
     switch (choice) {
-      case 'tasks':
-        await _openTasks();
       case 'puzzle':
         await _openPuzzle();
       case 'settings':
@@ -117,7 +102,7 @@ class MainShellState extends State<MainShell> {
             onOpenSport: () => goToTab(2),
             onOpenWellbeing: () => goToTab(3),
             onOpenPlanning: () => goToTab(1),
-            onOpenTasks: _openTasks,
+            onOpenTasks: () => goToTab(1),
             onOpenPuzzle: _openPuzzle,
             onOpenSettings: () {
               Navigator.of(context).push(

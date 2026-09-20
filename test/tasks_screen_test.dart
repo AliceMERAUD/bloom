@@ -60,13 +60,12 @@ void main() {
     expect(find.text('A faire'), findsNothing);
   });
 
-  testWidgets('MainShell expose Planning et menu Plus (Tasks)', (tester) async {
+  testWidgets('MainShell expose Planning (tâches intégrées)', (tester) async {
     await tester.pumpWidget(const MaterialApp(home: MainShell()));
     await tester.pump();
     expect(find.text('Planning'), findsWidgets);
-    expect(find.text('Plus'), findsOneWidget);
-    await tester.tap(find.text('Plus'));
-    await tester.pumpAndSettle();
-    expect(find.text('Tasks'), findsWidgets);
+    await tester.tap(find.text('Planning').last);
+    await tester.pump();
+    expect(find.text('Mes tâches'), findsOneWidget);
   });
 }
