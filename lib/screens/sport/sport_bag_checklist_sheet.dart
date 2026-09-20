@@ -39,6 +39,9 @@ class _SportBagChecklistViewState extends State<SportBagChecklistView> {
     final sportName = widget.sportId == null
         ? null
         : SportActivityService.getById(widget.sportId!)?.name;
+    final checked = _items.where((i) => i.checked).length;
+    final total = _items.length;
+    final ready = total > 0 && checked == total;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -68,6 +71,19 @@ class _SportBagChecklistViewState extends State<SportBagChecklistView> {
             ],
           ),
         ),
+        if (total > 0)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Text(
+              ready ? 'Sac prêt 🎒  ($checked / $total)' : '$checked / $total',
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                color: ready
+                    ? Theme.of(context).colorScheme.primary
+                    : null,
+              ),
+            ),
+          ),
         if (_items.isEmpty)
           const Padding(
             padding: EdgeInsets.all(24),

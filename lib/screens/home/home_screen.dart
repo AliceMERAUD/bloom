@@ -14,6 +14,10 @@ class HomeScreen extends StatefulWidget {
   final VoidCallback? onOpenTasks;
   final VoidCallback? onOpenPuzzle;
   final VoidCallback? onOpenSettings;
+  final VoidCallback? onAddTask;
+  final VoidCallback? onAddWellbeing;
+  final VoidCallback? onContinuePuzzle;
+  final VoidCallback? onStartSession;
 
   const HomeScreen({
     super.key,
@@ -22,6 +26,10 @@ class HomeScreen extends StatefulWidget {
     this.onOpenTasks,
     this.onOpenPuzzle,
     this.onOpenSettings,
+    this.onAddTask,
+    this.onAddWellbeing,
+    this.onContinuePuzzle,
+    this.onStartSession,
   });
 
   @override
@@ -88,17 +96,38 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               const SizedBox(height: 4),
               Text(
-                'Aujourd’hui sur Bloom',
+                data.motivationalLine,
                 style: Theme.of(context).textTheme.titleMedium,
+              ),
+              const SizedBox(height: 20),
+              BloomSection(
+                title: 'Aujourd’hui',
+                icon: Icons.spa,
+                accent: BloomTheme.accentGreen,
+                child: _TodayCard(
+                  data: data,
+                  onOpenTasks: widget.onOpenTasks,
+                  onOpenWellbeing: widget.onOpenWellbeing,
+                  onOpenSport: widget.onOpenSport,
+                  onOpenPuzzle: widget.onOpenPuzzle,
+                ),
               ),
               const SizedBox(height: 20),
               BloomSection(
                 title: 'Sport',
                 icon: Icons.fitness_center,
                 accent: BloomTheme.sport,
-                child: _SportCard(
-                  data: data,
-                  onOpen: widget.onOpenSport,
+                child: Column(
+                  children: [
+                    _SportCard(
+                      data: data,
+                      onOpen: widget.onOpenSport,
+                    ),
+                    if (data.tractionProgress?.hasData == true) ...[
+                      const SizedBox(height: 10),
+                      _TractionMiniCard(summary: data.tractionProgress!),
+                    ],
+                  ],
                 ),
               ),
               const SizedBox(height: 20),
@@ -139,24 +168,26 @@ class _HomeScreenState extends State<HomeScreen> {
                   runSpacing: 8,
                   children: [
                     FilledButton.tonalIcon(
-                      onPressed: widget.onOpenSport,
+                      onPressed: widget.onAddTask ?? widget.onOpenTasks,
+                      icon: const Icon(Icons.add_task, size: 18),
+                      label: const Text('+ Tâche'),
+                    ),
+                    FilledButton.tonalIcon(
+                      onPressed: widget.onStartSession ?? widget.onOpenSport,
                       icon: const Icon(Icons.fitness_center, size: 18),
-                      label: const Text('Séance'),
+                      label: const Text('+ Séance'),
                     ),
                     FilledButton.tonalIcon(
-                      onPressed: widget.onOpenWellbeing,
+                      onPressed:
+                          widget.onAddWellbeing ?? widget.onOpenWellbeing,
                       icon: const Icon(Icons.favorite, size: 18),
-                      label: const Text('Humeur'),
+                      label: const Text('+ Bien-être'),
                     ),
                     FilledButton.tonalIcon(
-                      onPressed: widget.onOpenTasks,
-                      icon: const Icon(Icons.checklist, size: 18),
-                      label: const Text('Tasks'),
-                    ),
-                    FilledButton.tonalIcon(
-                      onPressed: widget.onOpenPuzzle,
+                      onPressed:
+                          widget.onContinuePuzzle ?? widget.onOpenPuzzle,
                       icon: const Icon(Icons.extension, size: 18),
-                      label: const Text('Puzzle'),
+                      label: const Text('Continuer le puzzle'),
                     ),
                   ],
                 ),
@@ -165,62 +196,326 @@ class _HomeScreenState extends State<HomeScreen> {
               BloomSection(
                 title: 'Statistiques',
                 subtitle: 'Calculées à partir de tes données locales',
-                child: Column(
-                  children: [
-                    BloomStatChip(
-                      icon: Icons.fitness_center,
-                      label: 'Séances terminées',
-                      value: '${data.closedSessionCount}',
-                    ),
-                    const SizedBox(height: 8),
-                    BloomStatChip(
-                      icon: Icons.repeat,
-                      label: 'Séries enregistrées',
-                      value: '${data.totalSetCount}',
-                    ),
-                    const SizedBox(height: 8),
-                    BloomStatChip(
-                      icon: Icons.calendar_today,
-                      label: 'Jours bien-être',
-                      value: '${data.wellbeingDayCount}',
-                    ),
-                    const SizedBox(height: 8),
-                    BloomStatChip(
-                      icon: Icons.checklist,
-                      label: 'Tâches à faire',
-                      value: '${data.pendingTaskCount}',
-                    ),
-                    const SizedBox(height: 8),
-                    BloomStatChip(
-                      icon: Icons.warning_amber_outlined,
-                      label: 'Tâches en retard',
-                      value: '${data.overdueTaskCount}',
-                    ),
-                    const SizedBox(height: 8),
-                    BloomStatChip(
-                      icon: Icons.today_outlined,
-                      label: 'À faire aujourd’hui',
-                      value: '${data.dueTodayTaskCount}',
-                    ),
-                    const SizedBox(height: 8),
-                    BloomStatChip(
-                      icon: Icons.check_circle_outline,
-                      label: 'Terminées aujourd’hui',
-                      value: '${data.completedTasksToday}',
-                    ),
-                    const SizedBox(height: 8),
-                    BloomStatChip(
-                      icon: Icons.extension,
-                      label: 'Puzzles terminés',
-                      value: '${data.puzzleCompleted} / ${data.puzzleTotal}',
-                    ),
-                  ],
-                ),
+                child: _StatsSection(data: data),
               ),
             ],
           ),
         ),
       ),
+    );
+  }
+}
+
+class _TodayCard extends StatelessWidget {
+  final DashboardSnapshot data;
+  final VoidCallback? onOpenTasks;
+  final VoidCallback? onOpenWellbeing;
+  final VoidCallback? onOpenSport;
+  final VoidCallback? onOpenPuzzle;
+
+  const _TodayCard({
+    required this.data,
+    this.onOpenTasks,
+    this.onOpenWellbeing,
+    this.onOpenSport,
+    this.onOpenPuzzle,
+  });
+
+  List<_TodayLine> _lines() {
+    final lines = <_TodayLine>[];
+
+    if (data.overdueTaskCount > 0) {
+      lines.add(
+        _TodayLine(
+          icon: Icons.warning_amber_outlined,
+          text: '${data.overdueTaskCount} en retard',
+          onTap: onOpenTasks,
+          emphasize: true,
+        ),
+      );
+    }
+
+    if (data.dueTodayTaskCount > 0) {
+      lines.add(
+        _TodayLine(
+          icon: Icons.today_outlined,
+          text: '${data.dueTodayTaskCount} à faire aujourd’hui',
+          onTap: onOpenTasks,
+        ),
+      );
+    } else if (data.pendingTaskCount > 0) {
+      lines.add(
+        _TodayLine(
+          icon: Icons.checklist,
+          text: '${data.pendingTaskCount} tâche(s) en attente',
+          onTap: onOpenTasks,
+        ),
+      );
+    }
+
+    final sportTask = data.nextSportTask;
+    if (sportTask != null) {
+      final name = data.nextSportName ?? sportTask.title;
+      final time = sportTask.dueTime;
+      final timeLabel = time == null
+          ? null
+          : '${time.hour.toString().padLeft(2, '0')}:'
+              '${time.minute.toString().padLeft(2, '0')}';
+      lines.add(
+        _TodayLine(
+          icon: Icons.fitness_center,
+          text: timeLabel == null ? name : '$name · $timeLabel',
+          onTap: onOpenSport,
+        ),
+      );
+    }
+
+    final entry = data.todayEntry;
+    if (entry != null) {
+      final mood = entry.mood?.label;
+      final energy = entry.energy?.label;
+      final parts = <String>[
+        if (mood != null) 'Humeur $mood',
+        if (energy != null) 'Énergie $energy',
+      ];
+      lines.add(
+        _TodayLine(
+          icon: Icons.favorite,
+          text: parts.isEmpty ? 'Entrée du jour enregistrée' : parts.join(' · '),
+          onTap: onOpenWellbeing,
+        ),
+      );
+    } else {
+      lines.add(
+        _TodayLine(
+          icon: Icons.favorite_outline,
+          text: 'entrée du jour à compléter',
+          onTap: onOpenWellbeing,
+        ),
+      );
+    }
+
+    if (data.puzzleTotal > 0) {
+      lines.add(
+        _TodayLine(
+          icon: Icons.extension,
+          text: 'Puzzle ${data.puzzleCompleted} / ${data.puzzleTotal}',
+          onTap: onOpenPuzzle,
+        ),
+      );
+    }
+
+    return lines;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final lines = _lines();
+    if (lines.isEmpty) {
+      return BloomEmptyState(
+        icon: Icons.spa_outlined,
+        accent: BloomTheme.accentGreen,
+        message: 'Rien de prévu pour aujourd’hui — profite-en',
+      );
+    }
+
+    return BloomCard(
+      accent: BloomTheme.accentGreen,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (var i = 0; i < lines.length; i++) ...[
+            if (i > 0) const SizedBox(height: 10),
+            InkWell(
+              onTap: lines[i].onTap,
+              borderRadius: BorderRadius.circular(8),
+              child: Row(
+                children: [
+                  Icon(
+                    lines[i].icon,
+                    size: 18,
+                    color: lines[i].emphasize
+                        ? Theme.of(context).colorScheme.error
+                        : BloomTheme.accentGreen,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      lines[i].text,
+                      style: TextStyle(
+                        fontWeight: lines[i].emphasize
+                            ? FontWeight.w600
+                            : FontWeight.w500,
+                        color: lines[i].emphasize
+                            ? Theme.of(context).colorScheme.error
+                            : null,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _TodayLine {
+  final IconData icon;
+  final String text;
+  final VoidCallback? onTap;
+  final bool emphasize;
+
+  const _TodayLine({
+    required this.icon,
+    required this.text,
+    this.onTap,
+    this.emphasize = false,
+  });
+}
+
+class _TractionMiniCard extends StatelessWidget {
+  final TractionProgressSummary summary;
+
+  const _TractionMiniCard({required this.summary});
+
+  @override
+  Widget build(BuildContext context) {
+    final latest = summary.latestAssistance!;
+    final previous = summary.previousAssistance;
+    String detail;
+    if (previous != null) {
+      final delta = previous - latest;
+      if (delta > 0) {
+        detail =
+            'Assistance ${latest.toStringAsFixed(1)} kg (−${delta.toStringAsFixed(1)})';
+      } else if (delta < 0) {
+        detail =
+            'Assistance ${latest.toStringAsFixed(1)} kg (+${(-delta).toStringAsFixed(1)})';
+      } else {
+        detail = 'Assistance ${latest.toStringAsFixed(1)} kg (stable)';
+      }
+    } else {
+      detail = 'Assistance ${latest.toStringAsFixed(1)} kg';
+    }
+
+    return BloomCard(
+      accent: BloomTheme.sport,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      child: Row(
+        children: [
+          Icon(Icons.trending_up, color: BloomTheme.sport, size: 20),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Traction assistée',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                Text(
+                  detail,
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StatsSection extends StatelessWidget {
+  final DashboardSnapshot data;
+
+  const _StatsSection({required this.data});
+
+  @override
+  Widget build(BuildContext context) {
+    final rate = data.taskCompletionRate;
+    final traction = data.tractionProgress;
+    final chips = <Widget>[
+      BloomStatChip(
+        icon: Icons.fitness_center,
+        label: 'Séances terminées',
+        value: '${data.closedSessionCount}',
+        accent: BloomTheme.sport,
+      ),
+      BloomStatChip(
+        icon: Icons.repeat,
+        label: 'Séries enregistrées',
+        value: '${data.totalSetCount}',
+        accent: BloomTheme.sport,
+      ),
+      BloomStatChip(
+        icon: Icons.sports_gymnastics,
+        label: 'Exercices',
+        value: '${data.exerciseCatalogueCount}',
+        accent: BloomTheme.sport,
+      ),
+      BloomStatChip(
+        icon: Icons.calendar_today,
+        label: 'Jours bien-être',
+        value: '${data.wellbeingDayCount}',
+        accent: BloomTheme.wellbeing,
+      ),
+      BloomStatChip(
+        icon: Icons.water_drop_outlined,
+        label: 'Cycles',
+        value: '${data.periodCount}',
+        accent: BloomTheme.wellbeing,
+      ),
+      BloomStatChip(
+        icon: Icons.checklist,
+        label: 'Tâches restantes',
+        value: '${data.pendingTaskCount}',
+        accent: BloomTheme.tasks,
+      ),
+      BloomStatChip(
+        icon: Icons.warning_amber_outlined,
+        label: 'En retard',
+        value: '${data.overdueTaskCount}',
+        accent: BloomTheme.tasks,
+      ),
+      BloomStatChip(
+        icon: Icons.check_circle_outline,
+        label: 'Terminées',
+        value: '${data.completedTasksTotal}',
+        accent: BloomTheme.tasks,
+      ),
+      if (rate != null)
+        BloomStatChip(
+          icon: Icons.percent,
+          label: 'Taux de complétion',
+          value: '${(rate * 100).round()} %',
+          accent: BloomTheme.tasks,
+        ),
+      BloomStatChip(
+        icon: Icons.extension,
+        label: 'Puzzles',
+        value: '${data.puzzleCompleted} / ${data.puzzleTotal}',
+        accent: BloomTheme.puzzle,
+      ),
+      if (traction?.hasData == true)
+        BloomStatChip(
+          icon: Icons.trending_up,
+          label: 'Traction (assistance)',
+          value: '${traction!.latestAssistance!.toStringAsFixed(1)} kg',
+          accent: BloomTheme.sport,
+        ),
+    ];
+
+    return Column(
+      children: [
+        for (var i = 0; i < chips.length; i++) ...[
+          if (i > 0) const SizedBox(height: 8),
+          chips[i],
+        ],
+      ],
     );
   }
 }
@@ -235,14 +530,14 @@ class _SportCard extends StatelessWidget {
   Widget build(BuildContext context) {
     if (data.openSession != null) {
       return BloomCard(
+        accent: BloomTheme.sport,
         onTap: onOpen,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
-                Icon(Icons.play_circle_fill,
-                    color: Theme.of(context).colorScheme.primary),
+                Icon(Icons.play_circle_fill, color: BloomTheme.sport),
                 const SizedBox(width: 8),
                 const Text(
                   'Séance en cours',
@@ -268,6 +563,7 @@ class _SportCard extends StatelessWidget {
     if (!data.hasSportHistory) {
       return BloomEmptyState(
         icon: Icons.fitness_center,
+        accent: BloomTheme.sport,
         message: 'Aucune séance pour le moment',
         actionLabel: 'Commencer une séance',
         onAction: onOpen,
@@ -279,6 +575,7 @@ class _SportCard extends StatelessWidget {
         '${last.startedAt.day.toString().padLeft(2, '0')}/${last.startedAt.month.toString().padLeft(2, '0')}';
 
     return BloomCard(
+      accent: BloomTheme.sport,
       onTap: onOpen,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -312,6 +609,7 @@ class _WellbeingCard extends StatelessWidget {
     if (entry == null) {
       return BloomEmptyState(
         icon: Icons.favorite_outline,
+        accent: BloomTheme.wellbeing,
         message: 'Ta journée n’est pas encore renseignée',
         actionLabel: 'Ajouter mon humeur',
         onAction: onOpen,
@@ -322,6 +620,7 @@ class _WellbeingCard extends StatelessWidget {
     final energy = entry.energy?.label ?? 'Pas renseignée';
 
     return BloomCard(
+      accent: BloomTheme.wellbeing,
       onTap: onOpen,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -354,6 +653,7 @@ class _TasksCard extends StatelessWidget {
     if (data.pendingTaskCount == 0 && data.completedTasksToday == 0) {
       return BloomEmptyState(
         icon: Icons.checklist,
+        accent: BloomTheme.tasks,
         message: 'Aucune tâche pour le moment',
         actionLabel: 'Voir mes tâches',
         onAction: onOpen,
@@ -362,6 +662,7 @@ class _TasksCard extends StatelessWidget {
 
     if (data.pendingTaskCount == 0) {
       return BloomCard(
+        accent: BloomTheme.tasks,
         onTap: onOpen,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -383,16 +684,27 @@ class _TasksCard extends StatelessWidget {
     }
 
     return BloomCard(
+      accent: BloomTheme.tasks,
       onTap: onOpen,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
+          const Text(
             'À faire aujourd’hui',
-            style: const TextStyle(fontWeight: FontWeight.bold),
+            style: TextStyle(fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 6),
           Text('${data.pendingTaskCount} tâche(s) restante(s)'),
+          if (data.overdueTaskCount > 0) ...[
+            const SizedBox(height: 4),
+            Text(
+              '${data.overdueTaskCount} en retard',
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.error,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
           if (data.topPendingTaskTitles.isNotEmpty) ...[
             const SizedBox(height: 8),
             ...data.topPendingTaskTitles.map(
@@ -424,6 +736,7 @@ class _PuzzleCard extends StatelessWidget {
     if (!data.hasPuzzleProgress && data.nextPuzzleId == null) {
       return BloomEmptyState(
         icon: Icons.extension,
+        accent: BloomTheme.puzzle,
         message: 'Tu n’as encore terminé aucun puzzle',
         actionLabel: 'Jouer',
         onAction: onOpen,
@@ -433,6 +746,7 @@ class _PuzzleCard extends StatelessWidget {
     if (!data.hasPuzzleProgress) {
       return BloomEmptyState(
         icon: Icons.extension,
+        accent: BloomTheme.puzzle,
         message: 'Tu n’as encore terminé aucun puzzle',
         actionLabel: 'Jouer',
         onAction: onOpen,
@@ -440,6 +754,7 @@ class _PuzzleCard extends StatelessWidget {
     }
 
     return BloomCard(
+      accent: BloomTheme.puzzle,
       onTap: onOpen,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
