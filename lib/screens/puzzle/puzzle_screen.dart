@@ -4,6 +4,9 @@ import '../../app/theme.dart';
 import '../../models/puzzle/puzzle.dart';
 import '../../models/puzzle/puzzle_models.dart';
 import '../../models/puzzle/puzzle_scene.dart';
+import '../../services/puzzle/generated_puzzle_catalog_service.dart';
+import '../../services/puzzle/puzzle_difficulty_service.dart';
+import '../../services/puzzle/puzzle_repository.dart';
 import '../../services/puzzle_catalog.dart';
 import '../../services/puzzle_progress_service.dart';
 import '../../widgets/common/bloom_widgets.dart';
@@ -18,6 +21,9 @@ class PuzzleScreen extends StatefulWidget {
 
 class _PuzzleScreenState extends State<PuzzleScreen> {
   PuzzleProgress progress = const PuzzleProgress();
+  PlayerDifficultyState difficulty = const PlayerDifficultyState();
+  List<Puzzle> generated = const [];
+  bool _generating = false;
 
   @override
   void initState() {
@@ -28,6 +34,8 @@ class _PuzzleScreenState extends State<PuzzleScreen> {
   void _reload() {
     setState(() {
       progress = PuzzleProgressService.load();
+      difficulty = PuzzleDifficultyService.load();
+      generated = GeneratedPuzzleCatalogService.load().puzzles;
     });
   }
 
@@ -48,11 +56,29 @@ class _PuzzleScreenState extends State<PuzzleScreen> {
     if (mounted) _reload();
   }
 
+  Future<void> _playAdaptive() async {
+    if (_generating) return;
+    setState(() => _generating = true);
+    try {
+      final existing = GeneratedPuzzleCatalogService.latest();
+      final puzzle =
+          existing ?? await PuzzleRepository.ensureNextGenerated();
+      if (!mounted) return;
+      await _openPuzzle(puzzle);
+    } finally {
+      if (mounted) setState(() => _generating = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final puzzles = PuzzleCatalog.all;
     final nextId = progress.nextPlayableId;
-    final done = progress.completedIds.length;
+    final done = progress.completedIds
+        .where((id) => PuzzleCatalog.indexOf(id) >= 0)
+        .length;
+    final stars = '⭐' * difficulty.config.difficulty.starCount;
+    final allStaticDone = done >= puzzles.length;
 
     return Scaffold(
       appBar: AppBar(
@@ -72,16 +98,16 @@ class _PuzzleScreenState extends State<PuzzleScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        '$done / ${puzzles.length} terminés',
+                        'Niveau ${difficulty.level} · $stars',
                         style: const TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 16,
                         ),
                       ),
                       Text(
-                        done == puzzles.length
-                            ? 'Tous les puzzles sont terminés !'
-                            : 'Continue ta série de raisonnements',
+                        allStaticDone
+                            ? 'Puzzles adaptatifs · difficulté progressive'
+                            : '$done / ${puzzles.length} classiques terminés',
                         style: Theme.of(context).textTheme.bodySmall,
                       ),
                     ],
@@ -90,7 +116,47 @@ class _PuzzleScreenState extends State<PuzzleScreen> {
               ],
             ),
           ),
-          if (nextId != null && done < puzzles.length) ...[
+          const SizedBox(height: 12),
+          BloomCard(
+            accent: BloomTheme.puzzle,
+            onTap: _generating ? null : _playAdaptive,
+            child: Row(
+              children: [
+                Icon(
+                  Icons.auto_awesome,
+                  color: BloomTheme.puzzle,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _generating
+                            ? 'Génération…'
+                            : 'Puzzle adaptatif',
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      Text(
+                        '${difficulty.config.difficulty.label} · '
+                        '${difficulty.config.minSeats}–${difficulty.config.maxSeats} positions',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+                ),
+                if (_generating)
+                  const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                else
+                  const Icon(Icons.chevron_right),
+              ],
+            ),
+          ),
+          if (nextId != null && !allStaticDone) ...[
             const SizedBox(height: 12),
             BloomCard(
               accent: BloomTheme.puzzle,
@@ -116,7 +182,75 @@ class _PuzzleScreenState extends State<PuzzleScreen> {
               ),
             ),
           ],
+          if (generated.isNotEmpty) ...[
+            const SizedBox(height: 20),
+            Text(
+              'Récents générés',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+            ),
+            const SizedBox(height: 8),
+            ...generated.reversed.take(5).map((puzzle) {
+              final scene = PuzzleSceneTheme.forScenario(puzzle.scenario);
+              final completed = progress.isCompleted(puzzle.id);
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: BloomCard(
+                  accent: BloomTheme.puzzle,
+                  onTap: () => _openPuzzle(puzzle),
+                  child: Row(
+                    children: [
+                      CircleAvatar(
+                        backgroundColor:
+                            scene.accentColor.withValues(alpha: 0.35),
+                        child: completed
+                            ? const Icon(Icons.check, color: Colors.black87)
+                            : const Icon(Icons.auto_awesome, size: 18),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              puzzle.title,
+                              style:
+                                  const TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                            const SizedBox(height: 4),
+                            Wrap(
+                              spacing: 6,
+                              children: [
+                                BloomBadge(
+                                  label:
+                                      '${'⭐' * puzzle.difficulty.starCount} ${puzzle.difficulty.label}',
+                                  color: BloomTheme.puzzle,
+                                ),
+                                BloomBadge(
+                                  label: '${puzzle.seatCount} positions',
+                                  color: scene.accentColor,
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Icon(Icons.chevron_right),
+                    ],
+                  ),
+                ),
+              );
+            }),
+          ],
           const SizedBox(height: 16),
+          Text(
+            'Puzzles classiques',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+          ),
+          const SizedBox(height: 8),
           ...puzzles.asMap().entries.map((entry) {
             final index = entry.key + 1;
             final puzzle = entry.value;

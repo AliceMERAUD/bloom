@@ -28,6 +28,8 @@ void main() {
     await tester.pump();
 
     expect(find.text('Puzzle'), findsOneWidget);
+    expect(find.textContaining('Niveau'), findsOneWidget);
+    expect(find.text('Puzzle adaptatif'), findsOneWidget);
     expect(find.text('Les amis dans le bus'), findsWidgets);
   });
 }

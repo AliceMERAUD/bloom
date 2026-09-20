@@ -2,6 +2,7 @@ enum PuzzleDifficulty {
   easy,
   medium,
   hard,
+  veryHard,
 }
 
 extension PuzzleDifficultyX on PuzzleDifficulty {
@@ -13,7 +14,29 @@ extension PuzzleDifficultyX on PuzzleDifficulty {
         return 'Moyen';
       case PuzzleDifficulty.hard:
         return 'Difficile';
+      case PuzzleDifficulty.veryHard:
+        return 'Très difficile';
     }
+  }
+
+  int get starCount {
+    switch (this) {
+      case PuzzleDifficulty.easy:
+        return 1;
+      case PuzzleDifficulty.medium:
+        return 2;
+      case PuzzleDifficulty.hard:
+        return 3;
+      case PuzzleDifficulty.veryHard:
+        return 4;
+    }
+  }
+
+  static PuzzleDifficulty fromName(String? name) {
+    for (final value in PuzzleDifficulty.values) {
+      if (value.name == name) return value;
+    }
+    return PuzzleDifficulty.easy;
   }
 }
 

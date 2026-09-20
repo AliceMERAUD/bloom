@@ -44,6 +44,49 @@ class Puzzle {
   }
 
   String characterName(String id) => characterById(id)?.name ?? id;
+
+  Map<String, dynamic> toMap() => {
+        'id': id,
+        'title': title,
+        'description': description,
+        'scenario': scenario,
+        'difficulty': difficulty.name,
+        'characters': characters.map((c) => c.toMap()).toList(),
+        'positions': positions.map((p) => p.toMap()).toList(),
+        'constraints': constraints.map((c) => c.toMap()).toList(),
+        'referenceSolution': referenceSolution,
+        'createdAt': null, // filled by GeneratedPuzzleRecord when needed
+      };
+
+  factory Puzzle.fromMap(Map<dynamic, dynamic> map) {
+    final data = Map<String, dynamic>.from(map);
+    final characters = List<dynamic>.from(data['characters'] as List? ?? [])
+        .map((e) => PuzzleCharacter.fromMap(e as Map))
+        .toList();
+    final positions = List<dynamic>.from(data['positions'] as List? ?? [])
+        .map((e) => PuzzlePosition.fromMap(e as Map))
+        .toList();
+    final constraints = List<dynamic>.from(data['constraints'] as List? ?? [])
+        .map((e) => PuzzleConstraint.fromMap(e as Map))
+        .toList();
+    final rawSolution =
+        Map<dynamic, dynamic>.from(data['referenceSolution'] as Map? ?? {});
+    final solution = <String, int>{
+      for (final e in rawSolution.entries)
+        e.key.toString(): (e.value as num).toInt(),
+    };
+    return Puzzle(
+      id: data['id'] as String,
+      title: data['title'] as String? ?? 'Puzzle',
+      description: data['description'] as String? ?? '',
+      scenario: data['scenario'] as String? ?? 'bus',
+      difficulty: PuzzleDifficultyX.fromName(data['difficulty'] as String?),
+      characters: characters,
+      positions: positions,
+      constraints: constraints,
+      referenceSolution: solution,
+    );
+  }
 }
 
 class ConstraintCheck {
@@ -113,12 +156,16 @@ class PuzzleValidator {
   }
 
   /// Brute-force count of solutions (for tests / authoring).
-  static int countSolutions(Puzzle puzzle) {
+  /// When [stopAt] is set (e.g. 2 for uniqueness), stops as soon as that
+  /// many solutions are found — avoids exploding search for large puzzles.
+  static int countSolutions(Puzzle puzzle, {int? stopAt}) {
     final ids = puzzle.characters.map((c) => c.id).toList();
     final seats = List<int>.generate(puzzle.seatCount, (i) => i);
     var count = 0;
+    final limit = stopAt;
 
     void search(int depth, Map<String, int> current, Set<int> used) {
+      if (limit != null && count >= limit) return;
       if (depth == ids.length) {
         final placement = PuzzlePlacement(Map<String, int>.from(current));
         final result = validate(puzzle: puzzle, placement: placement);
@@ -128,10 +175,23 @@ class PuzzleValidator {
 
       final characterId = ids[depth];
       for (final seat in seats) {
+        if (limit != null && count >= limit) return;
         if (used.contains(seat)) continue;
         current[characterId] = seat;
         used.add(seat);
-        search(depth + 1, current, used);
+        // Prune: if any evaluable constraint already fails, skip subtree.
+        final trial = PuzzlePlacement(Map<String, int>.from(current));
+        final geo = puzzle.resolvedGeometry;
+        var broken = false;
+        for (final c in puzzle.constraints) {
+          if (c.canEvaluate(trial) && !c.isSatisfied(trial, geo)) {
+            broken = true;
+            break;
+          }
+        }
+        if (!broken) {
+          search(depth + 1, current, used);
+        }
         used.remove(seat);
         current.remove(characterId);
       }
@@ -139,6 +199,11 @@ class PuzzleValidator {
 
     search(0, {}, {});
     return count;
+  }
+
+  /// True iff exactly one solution exists (stops at 2).
+  static bool hasUniqueSolution(Puzzle puzzle) {
+    return countSolutions(puzzle, stopAt: 2) == 1;
   }
 }
 

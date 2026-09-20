@@ -17,8 +17,10 @@ class PuzzleProgress {
   bool isCompleted(String puzzleId) => completedIds.contains(puzzleId);
 
   bool isUnlocked(String puzzleId) {
+    if (puzzleId.startsWith('gen_')) return true;
     final index = PuzzleCatalog.indexOf(puzzleId);
-    if (index <= 0) return true;
+    if (index < 0) return true;
+    if (index == 0) return true;
     final previous = PuzzleCatalog.all[index - 1];
     return isCompleted(previous.id);
   }

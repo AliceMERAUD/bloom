@@ -7,6 +7,9 @@ import '../models/task.dart';
 import '../models/wellbeing_entry.dart';
 import '../models/workout_session.dart';
 import '../models/workout_set.dart';
+import 'puzzle/generated_puzzle_catalog_service.dart';
+import 'puzzle/puzzle_difficulty_service.dart';
+import 'puzzle/puzzle_history_service.dart';
 import 'puzzle_progress_service.dart';
 
 class StorageService {
@@ -225,6 +228,40 @@ class StorageService {
 
   static Future<void> savePuzzleProgress(PuzzleProgress progress) async {
     await _puzzleBox.put('progress', progress.toMap());
+  }
+
+  // --- Procedural puzzle keys (same Hive box, separate from `progress`) ---
+
+  static GeneratedPuzzleCatalog? getGeneratedPuzzleCatalog() {
+    final raw = _puzzleBox.get('generated_catalog');
+    if (raw == null) return null;
+    return GeneratedPuzzleCatalog.fromMap(raw as Map);
+  }
+
+  static Future<void> saveGeneratedPuzzleCatalog(
+    GeneratedPuzzleCatalog catalog,
+  ) async {
+    await _puzzleBox.put('generated_catalog', catalog.toMap());
+  }
+
+  static PlayerDifficultyState? getPlayerDifficulty() {
+    final raw = _puzzleBox.get('player_difficulty');
+    if (raw == null) return null;
+    return PlayerDifficultyState.fromMap(raw as Map);
+  }
+
+  static Future<void> savePlayerDifficulty(PlayerDifficultyState state) async {
+    await _puzzleBox.put('player_difficulty', state.toMap());
+  }
+
+  static PuzzleHistoryStore? getPuzzleHistory() {
+    final raw = _puzzleBox.get('puzzle_history');
+    if (raw == null) return null;
+    return PuzzleHistoryStore.fromMap(raw as Map);
+  }
+
+  static Future<void> savePuzzleHistory(PuzzleHistoryStore store) async {
+    await _puzzleBox.put('puzzle_history', store.toMap());
   }
 
   // --- App settings ---
