@@ -13,6 +13,7 @@ class HomeScreen extends StatefulWidget {
   final VoidCallback? onOpenWellbeing;
   final VoidCallback? onOpenTasks;
   final VoidCallback? onOpenPuzzle;
+  final VoidCallback? onOpenPlanning;
   final VoidCallback? onOpenSettings;
   final VoidCallback? onAddTask;
   final VoidCallback? onAddWellbeing;
@@ -25,6 +26,7 @@ class HomeScreen extends StatefulWidget {
     this.onOpenWellbeing,
     this.onOpenTasks,
     this.onOpenPuzzle,
+    this.onOpenPlanning,
     this.onOpenSettings,
     this.onAddTask,
     this.onAddWellbeing,
@@ -110,6 +112,16 @@ class _HomeScreenState extends State<HomeScreen> {
                   onOpenWellbeing: widget.onOpenWellbeing,
                   onOpenSport: widget.onOpenSport,
                   onOpenPuzzle: widget.onOpenPuzzle,
+                ),
+              ),
+              const SizedBox(height: 20),
+              BloomSection(
+                title: 'Planning & tâches',
+                icon: Icons.calendar_month,
+                accent: BloomTheme.planning,
+                child: _PlanningCard(
+                  data: data,
+                  onOpen: widget.onOpenPlanning ?? widget.onOpenTasks,
                 ),
               ),
               const SizedBox(height: 20),
@@ -355,6 +367,76 @@ class _TodayCard extends StatelessWidget {
                 ],
               ),
             ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _PlanningCard extends StatelessWidget {
+  final DashboardSnapshot data;
+  final VoidCallback? onOpen;
+
+  const _PlanningCard({required this.data, this.onOpen});
+
+  @override
+  Widget build(BuildContext context) {
+    final count = data.todayPlanningCount;
+    final upcoming = data.upcomingPlanning;
+
+    return BloomCard(
+      accent: BloomTheme.planning,
+      onTap: onOpen,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Text('📅', style: TextStyle(fontSize: 20)),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  count == 0
+                      ? 'Rien de prévu aujourd’hui'
+                      : 'Aujourd’hui : $count événement${count > 1 ? 's' : ''}',
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+              ),
+              TextButton(
+                onPressed: onOpen,
+                child: const Text('Ouvrir →'),
+              ),
+            ],
+          ),
+          if (data.dueTodayTaskCount > 0 || data.pendingTaskCount > 0) ...[
+            const SizedBox(height: 6),
+            Text(
+              data.dueTodayTaskCount > 0
+                  ? '${data.dueTodayTaskCount} tâche(s) aujourd’hui'
+                  : '${data.pendingTaskCount} tâche(s) en attente',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+          ],
+          if (upcoming.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(
+              'À venir',
+              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+            ),
+            const SizedBox(height: 6),
+            for (final item in upcoming)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Text(
+                  item.timeLabel == null
+                      ? '${item.title} · ${item.kindLabel}'
+                      : '${item.title} — ${item.timeLabel}',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+              ),
           ],
         ],
       ),

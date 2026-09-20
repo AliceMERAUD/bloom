@@ -8,8 +8,17 @@ import '../sport/sport_bag_screen.dart';
 
 class TaskFormScreen extends StatefulWidget {
   final BloomTask? task;
+  final DateTime? initialDueDate;
+  final TimeOfDay? initialDueTime;
+  final TaskCategory? initialCategory;
 
-  const TaskFormScreen({super.key, this.task});
+  const TaskFormScreen({
+    super.key,
+    this.task,
+    this.initialDueDate,
+    this.initialDueTime,
+    this.initialCategory,
+  });
 
   @override
   State<TaskFormScreen> createState() => _TaskFormScreenState();
@@ -46,6 +55,10 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
       _reminderEnabled = task.reminderEnabled;
       _reminderMinutesBefore = task.reminderMinutesBefore;
       _sportId = task.sportId;
+    } else {
+      _dueDate = widget.initialDueDate;
+      _dueTime = widget.initialDueTime;
+      _category = widget.initialCategory ?? TaskCategory.other;
     }
   }
 

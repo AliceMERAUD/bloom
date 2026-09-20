@@ -1,18 +1,19 @@
 import 'package:flutter/material.dart';
 
+import '../../app/theme.dart';
 import '../../services/bloom_refresh.dart';
 import '../../services/puzzle_progress_service.dart';
 import '../home/home_screen.dart';
+import '../planning/planning_screen.dart';
 import '../puzzle/puzzle_play_screen.dart';
 import '../puzzle/puzzle_screen.dart';
 import '../settings/settings_screen.dart';
 import '../sport/sport_screen.dart';
 import '../tasks/task_form_screen.dart';
-import '../tasks/tasks_screen.dart';
 import '../wellbeing/wellbeing_entry_screen.dart';
 import '../wellbeing/wellbeing_screen.dart';
 
-/// Root shell: Home / Sport / Wellbeing / Tasks / Puzzle.
+/// Root shell: Accueil / Planning / Sport / Bien-être / Plus.
 class MainShell extends StatefulWidget {
   final int initialIndex;
 
@@ -26,14 +27,17 @@ class MainShellState extends State<MainShell> {
   late int _index;
   final GlobalKey<SportScreenState> _sportKey = GlobalKey<SportScreenState>();
 
+  static const int _tabCount = 4; // Accueil, Planning, Sport, Bien-être
+  static const int _moreIndex = 4;
+
   @override
   void initState() {
     super.initState();
-    _index = widget.initialIndex;
+    _index = widget.initialIndex.clamp(0, _tabCount - 1);
   }
 
   void goToTab(int index) {
-    final next = index.clamp(0, 4);
+    final next = index.clamp(0, _tabCount - 1);
     if (next == 0) {
       BloomRefresh.notify();
     }
@@ -41,10 +45,51 @@ class MainShellState extends State<MainShell> {
   }
 
   Future<void> _startSessionShortcut() async {
-    goToTab(1);
-    // Let the Sport tab become visible before triggering the session flow.
+    goToTab(2);
     await Future<void>.delayed(const Duration(milliseconds: 50));
     await _sportKey.currentState?.startSessionFromShortcut();
+  }
+
+  Future<void> _openPuzzle() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const PuzzleScreen()),
+    );
+    BloomRefresh.notify();
+  }
+
+  Future<void> _showMoreMenu() async {
+    final choice = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (ctx) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: Icon(Icons.extension, color: BloomTheme.puzzle),
+                title: const Text('Puzzle'),
+                onTap: () => Navigator.pop(ctx, 'puzzle'),
+              ),
+              ListTile(
+                leading: const Icon(Icons.settings_outlined),
+                title: const Text('Paramètres'),
+                onTap: () => Navigator.pop(ctx, 'settings'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+    if (!mounted || choice == null) return;
+    switch (choice) {
+      case 'puzzle':
+        await _openPuzzle();
+      case 'settings':
+        await Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const SettingsScreen()),
+        );
+    }
   }
 
   @override
@@ -54,10 +99,11 @@ class MainShellState extends State<MainShell> {
         index: _index,
         children: [
           HomeScreen(
-            onOpenSport: () => goToTab(1),
-            onOpenWellbeing: () => goToTab(2),
-            onOpenTasks: () => goToTab(3),
-            onOpenPuzzle: () => goToTab(4),
+            onOpenSport: () => goToTab(2),
+            onOpenWellbeing: () => goToTab(3),
+            onOpenPlanning: () => goToTab(1),
+            onOpenTasks: () => goToTab(1),
+            onOpenPuzzle: _openPuzzle,
             onOpenSettings: () {
               Navigator.of(context).push(
                 MaterialPageRoute(builder: (_) => const SettingsScreen()),
@@ -82,7 +128,7 @@ class MainShellState extends State<MainShell> {
             onContinuePuzzle: () {
               final id = PuzzleProgressService.load().nextPlayableId;
               if (id == null) {
-                goToTab(4);
+                _openPuzzle();
                 return;
               }
               Navigator.of(context)
@@ -95,20 +141,30 @@ class MainShellState extends State<MainShell> {
             },
             onStartSession: _startSessionShortcut,
           ),
+          const PlanningScreen(),
           SportScreen(key: _sportKey),
           const WellbeingScreen(),
-          const TasksScreen(),
-          const PuzzleScreen(),
         ],
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,
-        onDestinationSelected: goToTab,
+        onDestinationSelected: (i) {
+          if (i == _moreIndex) {
+            _showMoreMenu();
+            return;
+          }
+          goToTab(i);
+        },
         destinations: const [
           NavigationDestination(
             icon: Icon(Icons.home_outlined),
             selectedIcon: Icon(Icons.home),
             label: 'Accueil',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.calendar_month_outlined),
+            selectedIcon: Icon(Icons.calendar_month),
+            label: 'Planning',
           ),
           NavigationDestination(
             icon: Icon(Icons.fitness_center_outlined),
@@ -121,14 +177,9 @@ class MainShellState extends State<MainShell> {
             label: 'Bien-être',
           ),
           NavigationDestination(
-            icon: Icon(Icons.checklist_outlined),
-            selectedIcon: Icon(Icons.checklist),
-            label: 'Tasks',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.extension_outlined),
-            selectedIcon: Icon(Icons.extension),
-            label: 'Puzzle',
+            icon: Icon(Icons.more_horiz),
+            selectedIcon: Icon(Icons.more_horiz),
+            label: 'Plus',
           ),
         ],
       ),
