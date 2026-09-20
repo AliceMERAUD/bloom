@@ -1,5 +1,7 @@
 import 'package:flutter/foundation.dart';
 
+import 'google_oauth_failure.dart';
+
 /// Non-secret Google Calendar preferences (safe to export).
 /// OAuth tokens stay with [GoogleSignIn] / secure channel — never here.
 class GoogleCalendarPrefs {
@@ -92,7 +94,25 @@ class GoogleCalendarException implements Exception {
   final String message;
   final Object? cause;
 
-  const GoogleCalendarException(this.message, [this.cause]);
+  /// Optional OAuth/network category for clearer diagnostics.
+  final GoogleOAuthFailureKind? kind;
+
+  const GoogleCalendarException(
+    this.message, [
+    this.cause,
+    this.kind,
+  ]);
+
+  factory GoogleCalendarException.fromFailure(
+    GoogleOAuthFailure failure, [
+    Object? cause,
+  ]) {
+    return GoogleCalendarException(
+      failure.userMessage,
+      cause,
+      failure.kind,
+    );
+  }
 
   @override
   String toString() => message;

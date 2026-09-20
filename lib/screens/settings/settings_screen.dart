@@ -1,13 +1,16 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../../models/app_settings.dart';
 import '../../models/google_calendar.dart';
+import '../../models/google_oauth_failure.dart';
 import '../../services/data_export_service.dart';
 import '../../services/google_calendar/google_calendar_service.dart';
+import '../../services/google_calendar/google_sign_in_config.dart';
 import '../../services/reminder_service.dart';
 import '../../services/settings_service.dart';
 import '../../services/storage_service.dart';
@@ -193,8 +196,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   void _showGcalError(Object e) {
     final message = e is GoogleCalendarException ? e.message : '$e';
+    final kind = e is GoogleCalendarException ? e.kind : null;
+    if (kDebugMode && kind != null) {
+      debugPrint('[Bloom GCal] UI error category: ${kind.debugLabel}');
+    }
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
+      SnackBar(
+        duration: const Duration(seconds: 8),
+        content: Text(
+          kind == null
+              ? message
+              : '$message\n\nDiagnostic : ${kind.debugLabel}',
+        ),
+      ),
     );
   }
 
@@ -217,9 +231,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     } catch (e) {
       if (mounted) {
         _showGcalError(
-          const GoogleCalendarException(
-            'Connexion Google impossible.\n'
-            'Vérifie ta connexion Internet et la configuration Google de Bloom.',
+          GoogleCalendarException.fromFailure(
+            GoogleOAuthFailure.fromKind(GoogleOAuthFailureKind.unknown),
+            e,
           ),
         );
       }
@@ -411,6 +425,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     onPressed: _connectGoogleCalendar,
                     child: const Text('Connecter Google'),
                   ),
+                if (kDebugMode) ...[
+                  const SizedBox(height: 12),
+                  Text(
+                    'Diagnostic OAuth (debug)\n'
+                    'Package : ${GoogleSignInConfig.androidApplicationId}\n'
+                    'Server Client ID : '
+                    '${GoogleSignInConfig.hasServerClientId ? "configuré" : "MANQUANT"}\n'
+                    'google-services.json : absent du dépôt\n'
+                    'SHA-1 : ne pas coller ici — '
+                    'keytool / docs/google_calendar_oauth.md',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ],
               ],
             ),
           ),

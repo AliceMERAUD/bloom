@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:bloom/models/app_settings.dart';
 import 'package:bloom/models/google_calendar.dart';
 import 'package:bloom/models/task.dart';
+import 'package:bloom/models/google_oauth_failure.dart';
 import 'package:bloom/services/google_calendar/google_sign_in_config.dart';
 import 'package:bloom/services/google_calendar/fake_google_calendar_backend.dart';
 import 'package:bloom/services/google_calendar/google_calendar_service.dart';
@@ -40,6 +41,20 @@ void main() {
       expect(
         GoogleSignInConfig.calendarScopes.any((s) => s.contains('calendar')),
         isTrue,
+      );
+    });
+  });
+
+  group('GoogleOAuthFailureKind', () {
+    test('messages utilisateur sans secrets', () {
+      for (final kind in GoogleOAuthFailureKind.values) {
+        expect(kind.userMessage, isNotEmpty);
+        expect(kind.userMessage.toLowerCase(), isNot(contains('ya29.')));
+        expect(kind.debugLabel, isNotEmpty);
+      }
+      expect(
+        GoogleOAuthFailureKind.serverClientIdMissing.userMessage,
+        contains('com.example.bloom'),
       );
     });
   });

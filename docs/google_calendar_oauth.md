@@ -1,39 +1,54 @@
 # Google Calendar OAuth — configuration Bloom
 
-Bloom pousse des tâches vers **Google Calendar** (pas de calendrier interne).
-L’authentification utilise `google_sign_in` + l’API Calendar.
+## Diagnostic actuel (vérifié dans le dépôt)
 
-## Diagnostic (Phase 9)
+| Élément | État |
+|--------|------|
+| `applicationId` / package réel | **`com.example.bloom`** (`android/app/build.gradle.kts` + APK) |
+| Message UI « com.example » | Truncation visuelle de **`com.example.bloom`** — ce n’est pas un autre package |
+| `google-services.json` | **Absent** |
+| `GOOGLE_SERVER_CLIENT_ID` (Web) | **Non fourni** au build (aucune valeur réelle dans le dépôt) |
+| Client OAuth Android Cloud | **À créer / vérifier manuellement** (hors dépôt) |
+| Client OAuth Web Cloud | **À créer manuellement** puis passer en dart-define |
+| Permission `INTERNET` | Présente dans `AndroidManifest.xml` |
 
-Cause la plus fréquente de l’erreur du type
-« Vérifie la configuration de l’authentification / du réseau » :
+### Cause exacte de l’échec actuel
 
-1. **Aucun `google-services.json`** dans le dépôt (volontaire pour rester léger).
-2. **Aucun `serverClientId` (client OAuth Web)** fourni au build.
-3. Client OAuth **Android** manquant ou SHA-1 / package incorrect dans Google Cloud.
+Bloom tourne **sans** `google-services.json`. Sur Android, `google_sign_in` exige alors le **Client ID Web** en `serverClientId`.
 
-Sur Android, sans `google-services.json`, le plugin exige le **client ID Web**
-en `serverClientId` (jamais le client ID Android).
+Ce client n’est **pas** configuré → catégorie diagnostic :
 
-## Valeurs Bloom actuelles
+```text
+Server Client ID incorrect / manquant
+```
 
-| Élément | Valeur |
-|--------|--------|
-| `applicationId` / package | `com.example.bloom` |
-| Fichier Gradle | `android/app/build.gradle.kts` |
-| `google-services.json` | **absent** (pas de Firebase obligatoire) |
-| Scopes | `calendar.events` + `calendar.readonly` |
+Même après ajout du client Web, le client **Android** doit correspondre à :
 
-### SHA debug (machine de développement actuelle)
+```text
+package = com.example.bloom
++
+SHA-1 du keystore debug utilisé par flutter run
+```
 
-Récupérés via `keytool` / `./gradlew signingReport` sur le keystore debug :
+Sinon → `ApiException: 10` / `OAuth Android incorrect`.
 
-- **SHA-1 :** `8F:A9:36:19:8C:9A:C0:D4:E0:36:AC:37:E0:75:44:57:E7:C2:D6:C1`
-- **SHA-256 :** `40:C2:9E:0D:7A:90:C9:55:A4:5F:18:FF:E7:D5:6C:E2:64:E7:6F:7B:57:74:68:F9:13:21:38:41:85:E8:B1:ED`
+**Le réseau n’est pas la cause principale** tant que OAuth n’est pas configuré.
 
-> Sur une autre machine, le SHA debug peut différer. Recalcule-le toujours localement.
+### Package `com.example.bloom`
 
-### Recalculer le SHA debug
+C’est encore le package Flutter par défaut. **On ne le renomme pas** dans cette correction :
+
+- l’APK et le code Kotlin (`MainActivity`) l’utilisent déjà ;
+- tout client OAuth déjà créé avec ce package resterait valide ;
+- un rename obligerait à recréer les clients Google Cloud.
+
+Si tu renommes plus tard (ex. `com.alice.bloom`), mets à jour Gradle + clients OAuth en même temps.
+
+---
+
+## SHA debug (ne pas coller dans le code)
+
+Récupère **toujours** le SHA de la machine qui exécute `flutter run` :
 
 ```bash
 keytool -list -v \
@@ -48,59 +63,58 @@ Ou :
 cd android && ./gradlew signingReport
 ```
 
+Sur la machine de développement actuelle (indicatif, peut différer ailleurs) :
+
+- SHA-1 : `8F:A9:36:19:8C:9A:C0:D4:E0:36:AC:37:E0:75:44:57:E7:C2:D6:C1`
+- SHA-256 : `40:C2:9E:0D:7A:90:C9:55:A4:5F:18:FF:E7:D5:6C:E2:64:E7:6F:7B:57:74:68:F9:13:21:38:41:85:E8:B1:ED`
+
+---
+
 ## Étapes manuelles Google Cloud Console
 
-Ne pas inventer de client ID : crée-les dans **ton** projet Cloud.
-
-1. Ouvre [Google Cloud Console](https://console.cloud.google.com/) → ton projet (ou crée-en un).
-2. **APIs & Services → Library** → active **Google Calendar API**.
-3. **APIs & Services → OAuth consent screen**
-   - Type : External (ou Internal si Workspace)
-   - Ajoute ton compte Google comme **test user** tant que l’app n’est pas vérifiée
-   - Scopes : `.../auth/calendar.events` et `.../auth/calendar.readonly`
-4. **APIs & Services → Credentials → Create credentials → OAuth client ID**
-   - **Android**
+1. [Google Cloud Console](https://console.cloud.google.com/) → ton projet
+2. **APIs & Services → Library** → activer **Google Calendar API**
+3. **OAuth consent screen** → ajouter ton compte comme **utilisateur de test**
+4. **Credentials → Create OAuth client ID**
+   - Type **Android**
      - Package name : `com.example.bloom`
-     - SHA-1 : celui de ta machine (ci-dessus ou recalculé)
-   - **Web application** (obligatoire pour Bloom sans `google-services.json`)
-     - Nom libre (ex. `Bloom Web`)
-     - Pas besoin d’URI de redirection pour ce flux mobile
-     - Copie le **Client ID** (`….apps.googleusercontent.com`)
-5. Lance Bloom en passant ce client Web :
+     - SHA-1 : celui de `keytool` / `signingReport` sur **ta** machine
+   - Type **Web application**
+     - Copier le Client ID (`….apps.googleusercontent.com`)
+5. Lancer Bloom avec le client **Web** (pas Android) :
 
 ```bash
-flutter run --dart-define=GOOGLE_SERVER_CLIENT_ID=TON_CLIENT_ID_WEB.apps.googleusercontent.com
+flutter run --dart-define=GOOGLE_SERVER_CLIENT_ID=COLLER_ICI_LE_CLIENT_WEB.apps.googleusercontent.com
 ```
 
-Ou pour un APK debug :
+Où récupérer le Client ID Web :
 
-```bash
-flutter build apk --debug \
-  --dart-define=GOOGLE_SERVER_CLIENT_ID=TON_CLIENT_ID_WEB.apps.googleusercontent.com
+```text
+Google Cloud Console
+→ APIs & Services
+→ Credentials
+→ OAuth 2.0 Client IDs
+→ entrée de type « Web application »
+→ Client ID
 ```
 
-## Option Firebase (alternative)
+Ne jamais committer de secret OAuth. Le Client ID Web se passe en dart-define.
 
-Si tu préfères Firebase :
-
-1. Ajoute une app Android `com.example.bloom` + SHA-1 debug
-2. Active Google Sign-In
-3. Télécharge `google-services.json` dans `android/app/`
-4. Applique le plugin Google Services Gradle (non câblé aujourd’hui)
-5. Le fichier doit contenir un client OAuth **Web** (`client_type: 3`)
-
-Sans Gradle Google Services, préfère `--dart-define=GOOGLE_SERVER_CLIENT_ID=…`.
+---
 
 ## Vérification dans Bloom
 
-1. Accueil → ⚙️ Paramètres → Google Calendar → **Connecter**
-2. Choisir le compte → accepter les permissions
-3. État **Connecté** + choix du calendrier
-4. Créer une tâche datée → **Ajouter à Google Calendar**
+1. Accueil → ⚙️ → Google Calendar  
+2. En debug : bloc **Diagnostic OAuth** (package + Server Client ID manquant/configuré)  
+3. **Connecter Google** → compte → permissions → état **Connecté**
 
-## Sécurité
+## Catégories d’erreur (debug)
 
-- Ne committe **jamais** de client secret, access token ou refresh token.
-- Le client ID Web peut être passé en dart-define (ce n’est pas un secret serveur classique),
-  mais évite de le committer en dur dans le dépôt si tu préfères.
-- Les logs debug Bloom n’affichent pas les tokens.
+| Diagnostic | Signification |
+|------------|----------------|
+| Utilisateur a annulé | Picker fermé |
+| Server Client ID incorrect / manquant | Pas de `GOOGLE_SERVER_CLIENT_ID` |
+| OAuth Android incorrect | package / SHA-1 / clients Cloud |
+| Connexion réseau impossible | DNS / offline / ApiException 7 |
+| Permission refusée | Consent scopes |
+| Token indisponible | Session sans access token |

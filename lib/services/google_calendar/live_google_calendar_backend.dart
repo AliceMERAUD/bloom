@@ -6,6 +6,7 @@ import 'package:googleapis/calendar/v3.dart' as gcal;
 import 'package:googleapis_auth/googleapis_auth.dart';
 
 import '../../models/google_calendar.dart';
+import '../../models/google_oauth_failure.dart';
 import 'google_calendar_backend.dart';
 import 'google_sign_in_config.dart';
 
@@ -25,27 +26,32 @@ class LiveGoogleCalendarBackend implements GoogleCalendarBackend {
     if (error == null) {
       debugPrint('[Bloom GCal] $message');
     } else {
-      // Never log tokens — only exception type / sanitized message.
-      debugPrint('[Bloom GCal] $message (${error.runtimeType}: ${_sanitize(error)})');
+      debugPrint(
+        '[Bloom GCal] $message (${error.runtimeType}: ${_sanitize(error)})',
+      );
     }
   }
 
   String _sanitize(Object error) {
     final raw = error.toString();
-    // Strip anything that looks like a bearer / long opaque token.
     return raw
         .replaceAll(RegExp(r'ya29\.[A-Za-z0-9._\-]+'), '[redacted]')
         .replaceAll(RegExp(r'1//[A-Za-z0-9_\-]+'), '[redacted]');
+  }
+
+  Never _throwKind(GoogleOAuthFailureKind kind, [Object? cause]) {
+    _log('failure kind=${kind.name} (${kind.debugLabel})', cause);
+    throw GoogleCalendarException.fromFailure(
+      GoogleOAuthFailure.fromKind(kind),
+      cause,
+    );
   }
 
   Future<AuthClient> _client() async {
     final client = await _signIn.authenticatedClient();
     if (client == null) {
       _log('authenticatedClient returned null (token unavailable)');
-      throw const GoogleCalendarException(
-        'Session Google expirée ou token indisponible.\n'
-        'Reconnecte Google Calendar dans les paramètres.',
-      );
+      _throwKind(GoogleOAuthFailureKind.tokenUnavailable);
     }
     return client;
   }
@@ -68,11 +74,18 @@ class LiveGoogleCalendarBackend implements GoogleCalendarBackend {
   @override
   Future<String?> signIn() async {
     try {
+      if (!GoogleSignInConfig.hasServerClientId) {
+        _log(
+          'signIn blocked: GOOGLE_SERVER_CLIENT_ID missing '
+          '(no google-services.json in project)',
+        );
+        _throwKind(GoogleOAuthFailureKind.serverClientIdMissing);
+      }
       _log('signIn started');
       final account = await _signIn.signIn();
       if (account == null) {
         _log('signIn cancelled by user');
-        throw const GoogleCalendarException('Connexion Google annulée.');
+        _throwKind(GoogleOAuthFailureKind.cancelled);
       }
       _log('signIn success for account (email kept out of logs)');
       return account.email;
@@ -80,14 +93,14 @@ class LiveGoogleCalendarBackend implements GoogleCalendarBackend {
       rethrow;
     } on PlatformException catch (e) {
       _log('signIn PlatformException code=${e.code}', e);
-      throw GoogleCalendarException(_mapPlatformSignInError(e), e);
+      _throwKind(_classifyPlatform(e), e);
     } catch (e) {
       _log('signIn unexpected error', e);
-      throw GoogleCalendarException(_mapGenericSignInError(e), e);
+      _throwKind(_classifyGeneric(e), e);
     }
   }
 
-  String _mapPlatformSignInError(PlatformException e) {
+  GoogleOAuthFailureKind _classifyPlatform(PlatformException e) {
     final code = e.code.toLowerCase();
     final message = (e.message ?? '').toLowerCase();
     final details = '${e.details ?? ''}'.toLowerCase();
@@ -97,61 +110,51 @@ class LiveGoogleCalendarBackend implements GoogleCalendarBackend {
         code.contains('cancelled') ||
         blob.contains('sign_in_canceled') ||
         blob.contains('sign_in_cancelled')) {
-      return 'Connexion Google annulée.';
+      return GoogleOAuthFailureKind.cancelled;
     }
 
-    // CommonStatusCodes.DEVELOPER_ERROR = 10
     if (blob.contains('apiexception: 10') ||
         blob.contains('statuscode=10') ||
         blob.contains('developer_error')) {
-      return 'La configuration Google de Bloom semble incorrecte.\n'
-          'Vérifie la configuration OAuth Android '
-          '(package ${GoogleSignInConfig.androidApplicationId}, SHA-1 debug, '
-          'client Web / GOOGLE_SERVER_CLIENT_ID).';
+      return GoogleOAuthFailureKind.oauthAndroidMisconfigured;
     }
 
-    // NETWORK_ERROR = 7
     if (blob.contains('apiexception: 7') ||
         blob.contains('network_error') ||
-        blob.contains('network')) {
-      return 'Connexion Google impossible.\n'
-          'Vérifie ta connexion Internet et réessaie.';
+        (blob.contains('network') && !blob.contains('developer'))) {
+      return GoogleOAuthFailureKind.network;
     }
 
-    // SIGN_IN_REQUIRED / SIGN_IN_FAILED
+    if (blob.contains('access_denied') ||
+        blob.contains('permission') ||
+        blob.contains('consent')) {
+      return GoogleOAuthFailureKind.permissionDenied;
+    }
+
     if (blob.contains('sign_in_failed') || blob.contains('sign_in_required')) {
       if (!GoogleSignInConfig.hasServerClientId) {
-        return 'La configuration Google de Bloom semble incorrecte.\n'
-            'Ajoute un client OAuth Web (GOOGLE_SERVER_CLIENT_ID) '
-            'et enregistre le SHA-1 debug — voir docs/google_calendar_oauth.md.';
+        return GoogleOAuthFailureKind.serverClientIdMissing;
       }
-      return 'Connexion Google impossible.\n'
-          'Vérifie ta connexion Internet et la configuration Google de Bloom.';
+      return GoogleOAuthFailureKind.oauthAndroidMisconfigured;
     }
 
-    return 'Connexion Google impossible.\n'
-        'Vérifie ta connexion Internet et la configuration Google de Bloom.';
+    return GoogleOAuthFailureKind.unknown;
   }
 
-  String _mapGenericSignInError(Object e) {
+  GoogleOAuthFailureKind _classifyGeneric(Object e) {
     final blob = e.toString().toLowerCase();
     if (blob.contains('apiexception: 10') || blob.contains('developer_error')) {
-      return 'La configuration Google de Bloom semble incorrecte.\n'
-          'Vérifie la configuration OAuth Android.';
+      return GoogleOAuthFailureKind.oauthAndroidMisconfigured;
     }
     if (blob.contains('socket') ||
         blob.contains('network') ||
         blob.contains('failed host lookup')) {
-      return 'Connexion Google impossible.\n'
-          'Vérifie ta connexion Internet et réessaie.';
+      return GoogleOAuthFailureKind.network;
     }
     if (!GoogleSignInConfig.hasServerClientId) {
-      return 'La configuration Google de Bloom semble incorrecte.\n'
-          'Vérifie la configuration OAuth Android '
-          '(voir docs/google_calendar_oauth.md).';
+      return GoogleOAuthFailureKind.serverClientIdMissing;
     }
-    return 'Impossible de se connecter à Google Calendar.\n'
-        'Vérifie ta connexion Internet et la configuration Google de Bloom.';
+    return GoogleOAuthFailureKind.unknown;
   }
 
   @override
@@ -189,6 +192,7 @@ class LiveGoogleCalendarBackend implements GoogleCalendarBackend {
       throw GoogleCalendarException(
         'Impossible de charger tes calendriers Google.',
         e,
+        _classifyGeneric(e),
       );
     }
   }
@@ -199,7 +203,8 @@ class LiveGoogleCalendarBackend implements GoogleCalendarBackend {
       ..description = draft.description;
 
     if (draft.allDay) {
-      final day = DateTime(draft.start.year, draft.start.month, draft.start.day);
+      final day =
+          DateTime(draft.start.year, draft.start.month, draft.start.day);
       final endDay = DateTime(draft.end.year, draft.end.month, draft.end.day);
       event.start = gcal.EventDateTime(date: day);
       event.end = gcal.EventDateTime(date: endDay);
