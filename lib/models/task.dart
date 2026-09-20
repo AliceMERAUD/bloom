@@ -138,6 +138,9 @@ class BloomTask {
   /// Links a completed recurring task to the next occurrence (avoids duplicates).
   final String? nextOccurrenceId;
 
+  /// Google Calendar event id when this task was pushed to Calendar (Bloom → GCal).
+  final String? googleCalendarEventId;
+
   const BloomTask({
     required this.id,
     required this.title,
@@ -155,6 +158,7 @@ class BloomTask {
     this.reminderMinutesBefore = 0,
     this.sportId,
     this.nextOccurrenceId,
+    this.googleCalendarEventId,
   });
 
   bool get isPending => !completed;
@@ -198,6 +202,7 @@ class BloomTask {
     int? reminderMinutesBefore,
     String? sportId,
     String? nextOccurrenceId,
+    String? googleCalendarEventId,
     bool clearDescription = false,
     bool clearDueDate = false,
     bool clearDueTime = false,
@@ -205,6 +210,7 @@ class BloomTask {
     bool clearReminderId = false,
     bool clearNextOccurrenceId = false,
     bool clearSportId = false,
+    bool clearGoogleCalendarEventId = false,
   }) {
     return BloomTask(
       id: id ?? this.id,
@@ -227,6 +233,9 @@ class BloomTask {
       nextOccurrenceId: clearNextOccurrenceId
           ? null
           : (nextOccurrenceId ?? this.nextOccurrenceId),
+      googleCalendarEventId: clearGoogleCalendarEventId
+          ? null
+          : (googleCalendarEventId ?? this.googleCalendarEventId),
     );
   }
 
@@ -248,6 +257,7 @@ class BloomTask {
         'reminderMinutesBefore': reminderMinutesBefore,
         'sportId': sportId,
         'nextOccurrenceId': nextOccurrenceId,
+        'googleCalendarEventId': googleCalendarEventId,
       };
 
   factory BloomTask.fromMap(Map<dynamic, dynamic> map) {
@@ -278,6 +288,7 @@ class BloomTask {
           (data['reminderMinutesBefore'] as num?)?.toInt() ?? 0,
       sportId: data['sportId'] as String?,
       nextOccurrenceId: data['nextOccurrenceId'] as String?,
+      googleCalendarEventId: data['googleCalendarEventId'] as String?,
     );
   }
 }
