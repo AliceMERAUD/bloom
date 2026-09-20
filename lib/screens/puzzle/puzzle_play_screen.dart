@@ -5,6 +5,10 @@ import '../../models/puzzle/puzzle.dart';
 import '../../models/puzzle/puzzle_models.dart';
 import '../../models/puzzle/puzzle_scene.dart';
 import '../../services/bloom_refresh.dart';
+import '../../services/puzzle/puzzle_difficulty_service.dart';
+import '../../services/puzzle/puzzle_generation_config.dart';
+import '../../services/puzzle/puzzle_history_service.dart';
+import '../../services/puzzle/puzzle_repository.dart';
 import '../../services/puzzle_catalog.dart';
 import '../../services/puzzle_progress_service.dart';
 import '../../widgets/common/bloom_widgets.dart';
@@ -35,16 +39,21 @@ class PuzzlePlayScreenState extends State<PuzzlePlayScreen>
   String? selectedCharacterId;
   PuzzleValidationResult? lastResult;
   bool solved = false;
+  bool _loadingNext = false;
   int _hintLevel = 0;
   int hintsUsed = 0;
   late final AnimationController _verifyPulse;
+  late final int _maxHints;
 
   @override
   void initState() {
     super.initState();
-    puzzle = PuzzleCatalog.byId(widget.puzzleId);
+    puzzle = PuzzleRepository.byId(widget.puzzleId) ??
+        PuzzleCatalog.byId(widget.puzzleId);
     final saved = PuzzleProgressService.load().placements[widget.puzzleId];
     placement = saved ?? const PuzzlePlacement();
+    _maxHints =
+        PuzzleGenerationConfig.forDifficulty(puzzle.difficulty).maxHints;
     _verifyPulse = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 180),
@@ -145,6 +154,19 @@ class PuzzlePlayScreenState extends State<PuzzlePlayScreen>
   }
 
   void _showHint() {
+    if (_maxHints <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Aucun indice à ce niveau de difficulté.')),
+      );
+      return;
+    }
+    if (hintsUsed >= _maxHints) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Indices épuisés ($_maxHints max).')),
+      );
+      return;
+    }
+
     final message =
         PuzzleHintService.describeHint(puzzle, placement, _hintLevel);
 
@@ -187,12 +209,22 @@ class PuzzlePlayScreenState extends State<PuzzlePlayScreen>
     });
 
     if (result.isSolved) {
+      PlayerDifficultyState? difficulty;
       if (!suppressPersistence) {
-        PuzzleProgressService.markCompleted(puzzle.id);
+        await PuzzleProgressService.markCompleted(puzzle.id);
+        difficulty = await PuzzleDifficultyService.recordWin();
+        await PuzzleHistoryService.recordAttempt(
+          puzzleId: puzzle.id,
+          success: true,
+          difficulty: puzzle.difficulty.name,
+          hintsUsed: hintsUsed,
+          generated: PuzzleRepository.isGenerated(puzzle.id),
+          playerLevel: difficulty.level,
+        );
         BloomRefresh.notify();
       }
       if (!mounted || !showSuccessDialog) return;
-      await _showSuccessSheet();
+      await _showSuccessSheet(difficulty ?? PuzzleDifficultyService.load());
     } else if (!result.isComplete) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -201,16 +233,30 @@ class PuzzlePlayScreenState extends State<PuzzlePlayScreen>
         ),
       );
     } else {
+      if (!suppressPersistence) {
+        await PuzzleDifficultyService.recordLoss();
+        await PuzzleHistoryService.recordAttempt(
+          puzzleId: puzzle.id,
+          success: false,
+          difficulty: puzzle.difficulty.name,
+          hintsUsed: hintsUsed,
+          generated: PuzzleRepository.isGenerated(puzzle.id),
+          playerLevel: PuzzleDifficultyService.load().level,
+        );
+      }
       if (!mounted) return;
       await _showFailureSheet(result);
     }
   }
 
-  Future<void> _showSuccessSheet() async {
+  Future<void> _showSuccessSheet(PlayerDifficultyState difficulty) async {
     final index = PuzzleCatalog.indexOf(puzzle.id);
-    final isLast = index >= PuzzleCatalog.all.length - 1;
+    final isGenerated = PuzzleRepository.isGenerated(puzzle.id);
+    final isLastStatic =
+        !isGenerated && index >= PuzzleCatalog.all.length - 1;
     final progress = PuzzleProgressService.load();
     final completed = progress.completedIds.length;
+    final stars = '⭐' * difficulty.config.difficulty.starCount;
 
     await showModalBottomSheet<void>(
       context: context,
@@ -225,8 +271,8 @@ class PuzzlePlayScreenState extends State<PuzzlePlayScreen>
               const Text('🎉', style: TextStyle(fontSize: 42)),
               const SizedBox(height: 8),
               Text(
-                isLast
-                    ? 'Bravo ! Tu as terminé tous les puzzles !'
+                isLastStatic
+                    ? 'Bravo ! Puzzles classiques terminés'
                     : 'Bravo !',
                 textAlign: TextAlign.center,
                 style: Theme.of(ctx).textTheme.headlineSmall?.copyWith(
@@ -236,8 +282,8 @@ class PuzzlePlayScreenState extends State<PuzzlePlayScreen>
               ),
               const SizedBox(height: 8),
               Text(
-                isLast
-                    ? 'Quelle belle série de raisonnements 🌱'
+                isLastStatic
+                    ? 'La suite : puzzles adaptatifs générés pour toi.'
                     : 'Toutes les contraintes sont respectées.',
                 textAlign: TextAlign.center,
               ),
@@ -248,8 +294,12 @@ class PuzzlePlayScreenState extends State<PuzzlePlayScreen>
                 alignment: WrapAlignment.center,
                 children: [
                   BloomBadge(
-                    label: 'Progression $completed / ${PuzzleCatalog.all.length}',
+                    label: 'Niveau ${difficulty.level}',
                     color: BloomTheme.puzzle,
+                  ),
+                  BloomBadge(
+                    label: 'Difficulté $stars',
+                    color: BloomTheme.accentGreen,
                   ),
                   BloomBadge(
                     label: hintsUsed == 0
@@ -257,35 +307,29 @@ class PuzzlePlayScreenState extends State<PuzzlePlayScreen>
                         : '$hintsUsed indice(s)',
                     color: BloomTheme.accentGreen,
                   ),
+                  if (!isGenerated)
+                    BloomBadge(
+                      label:
+                          'Classiques $completed / ${PuzzleCatalog.all.length}',
+                      color: BloomTheme.puzzle,
+                    ),
                 ],
               ),
               const SizedBox(height: 20),
-              if (isLast)
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton(
-                    onPressed: () {
-                      Navigator.pop(ctx);
-                      Navigator.pop(context);
-                    },
-                    child: const Text('Retour aux puzzles'),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: BloomTheme.puzzle,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
                   ),
-                )
-              else
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton(
-                    style: FilledButton.styleFrom(
-                      backgroundColor: BloomTheme.puzzle,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                    ),
-                    onPressed: () {
-                      Navigator.pop(ctx);
-                      _nextPuzzle();
-                    },
-                    child: const Text('Puzzle suivant →'),
-                  ),
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    _nextPuzzle();
+                  },
+                  child: const Text('Puzzle suivant →'),
                 ),
+              ),
               TextButton(
                 onPressed: () => Navigator.pop(ctx),
                 child: const Text('Rester ici'),
@@ -359,23 +403,37 @@ class PuzzlePlayScreenState extends State<PuzzlePlayScreen>
     return text;
   }
 
-  void _nextPuzzle() {
+  Future<void> _nextPuzzle() async {
+    if (_loadingNext) return;
+    final progress = PuzzleProgressService.load();
     final index = PuzzleCatalog.indexOf(puzzle.id);
-    if (index < 0 || index >= PuzzleCatalog.all.length - 1) {
-      Navigator.pop(context);
-      return;
+
+    late final Puzzle next;
+    if (index >= 0 && index < PuzzleCatalog.all.length - 1) {
+      final candidate = PuzzleCatalog.all[index + 1];
+      if (!progress.isUnlocked(candidate.id) && !solved) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Termine ce puzzle pour débloquer le suivant.'),
+          ),
+        );
+        return;
+      }
+      next = candidate;
+    } else {
+      setState(() => _loadingNext = true);
+      try {
+        if (!suppressPersistence) {
+          next = await PuzzleRepository.ensureNextGenerated();
+        } else {
+          next = PuzzleCatalog.all.first;
+        }
+      } finally {
+        if (mounted) setState(() => _loadingNext = false);
+      }
     }
 
-    final next = PuzzleCatalog.all[index + 1];
-    final progress = PuzzleProgressService.load();
-    if (!progress.isUnlocked(next.id) && !solved) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Termine ce puzzle pour débloquer le suivant.'),
-        ),
-      );
-      return;
-    }
+    if (!mounted) return;
 
     Navigator.pushReplacement(
       context,
@@ -392,14 +450,17 @@ class PuzzlePlayScreenState extends State<PuzzlePlayScreen>
   @override
   Widget build(BuildContext context) {
     final progress = PuzzleProgressService.load();
-    final puzzleIndex = PuzzleCatalog.indexOf(puzzle.id) + 1;
+    final staticIndex = PuzzleCatalog.indexOf(puzzle.id);
+    final isGenerated = PuzzleRepository.isGenerated(puzzle.id);
+    final playerLevel = PuzzleDifficultyService.load().level;
+    final puzzleLabel = isGenerated
+        ? 'Adaptatif · Niv. $playerLevel'
+        : '${staticIndex + 1} / ${PuzzleCatalog.all.length}';
     final unplaced = puzzle.characters
         .where((c) => placement.indexOf(c.id) == null)
         .toList();
     final scene = PuzzleSceneTheme.forScenario(puzzle.scenario);
     final canGoNext = solved || progress.isCompleted(puzzle.id);
-    final isLast = PuzzleCatalog.indexOf(puzzle.id) >=
-        PuzzleCatalog.all.length - 1;
 
     return Scaffold(
       appBar: AppBar(
@@ -408,13 +469,13 @@ class PuzzlePlayScreenState extends State<PuzzlePlayScreen>
           IconButton(
             tooltip: 'Indice',
             icon: const Icon(Icons.lightbulb_outline),
-            onPressed: solved ? null : _showHint,
+            onPressed: solved || _maxHints <= 0 ? null : _showHint,
           ),
           Padding(
             padding: const EdgeInsets.only(right: 12),
             child: Center(
               child: BloomBadge(
-                label: '$puzzleIndex / ${PuzzleCatalog.all.length}',
+                label: puzzleLabel,
                 color: BloomTheme.puzzle,
               ),
             ),
@@ -552,13 +613,17 @@ class PuzzlePlayScreenState extends State<PuzzlePlayScreen>
                       ),
                     ],
                   ),
-                  if (canGoNext && !isLast) ...[
+                  if (canGoNext) ...[
                     const SizedBox(height: 8),
                     SizedBox(
                       width: double.infinity,
                       child: FilledButton.tonal(
-                        onPressed: _nextPuzzle,
-                        child: const Text('Puzzle suivant →'),
+                        onPressed: _loadingNext ? null : _nextPuzzle,
+                        child: Text(
+                          _loadingNext
+                              ? 'Génération…'
+                              : 'Puzzle suivant →',
+                        ),
                       ),
                     ),
                   ],

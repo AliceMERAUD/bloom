@@ -5,7 +5,9 @@ import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../../models/app_settings.dart';
+import '../../models/google_calendar.dart';
 import '../../services/data_export_service.dart';
+import '../../services/google_calendar/google_calendar_service.dart';
 import '../../services/reminder_service.dart';
 import '../../services/settings_service.dart';
 import '../../services/storage_service.dart';
@@ -189,9 +191,90 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  void _showGcalError(Object e) {
+    final message = e is GoogleCalendarException ? e.message : '$e';
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
+  }
+
+  Future<void> _connectGoogleCalendar() async {
+    try {
+      final ok = await GoogleCalendarService.connect();
+      if (!mounted) return;
+      setState(() {});
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            ok
+                ? 'Google Calendar connecté.'
+                : 'Connexion annulée ou impossible.',
+          ),
+        ),
+      );
+    } on GoogleCalendarException catch (e) {
+      if (mounted) _showGcalError(e);
+    } catch (e) {
+      if (mounted) _showGcalError(e);
+    }
+  }
+
+  Future<void> _disconnectGoogleCalendar() async {
+    try {
+      await GoogleCalendarService.disconnect();
+      if (!mounted) return;
+      setState(() {});
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Google Calendar déconnecté.')),
+      );
+    } on GoogleCalendarException catch (e) {
+      if (mounted) _showGcalError(e);
+    } catch (e) {
+      if (mounted) _showGcalError(e);
+    }
+  }
+
+  Future<void> _pickGoogleCalendar() async {
+    try {
+      final calendars = await GoogleCalendarService.listCalendars();
+      if (!mounted) return;
+      if (calendars.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Aucun calendrier disponible.')),
+        );
+        return;
+      }
+      final selected = await showDialog<GoogleCalendarInfo>(
+        context: context,
+        builder: (ctx) => SimpleDialog(
+          title: const Text('Choisir un calendrier'),
+          children: [
+            for (final c in calendars)
+              SimpleDialogOption(
+                onPressed: () => Navigator.pop(ctx, c),
+                child: Text(
+                  c.primary ? '${c.summary} (principal)' : c.summary,
+                ),
+              ),
+          ],
+        ),
+      );
+      if (selected == null) return;
+      await GoogleCalendarService.selectCalendar(selected);
+      if (!mounted) return;
+      setState(() {});
+    } on GoogleCalendarException catch (e) {
+      if (mounted) _showGcalError(e);
+    } catch (e) {
+      if (mounted) _showGcalError(e);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final settings = _settings;
+    final gcal = settings.googleCalendar;
+    final connected = gcal.accountEmail != null;
 
     return Scaffold(
       appBar: AppBar(
@@ -268,6 +351,56 @@ class _SettingsScreenState extends State<SettingsScreen> {
               onSelectionChanged: (selected) {
                 _update((s) => s.copyWith(themeMode: selected.first));
               },
+            ),
+          ),
+          const SizedBox(height: 24),
+          BloomSection(
+            title: 'Google Calendar',
+            subtitle:
+                'Bloom reste utilisable hors ligne ; OAuth requis côté Google Cloud',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(
+                    connected
+                        ? Icons.check_circle_outline
+                        : Icons.cloud_off_outlined,
+                  ),
+                  title: Text(connected ? 'Connecté' : 'Non connecté'),
+                  subtitle: connected
+                      ? Text(gcal.accountEmail!)
+                      : const Text('Aucun compte Google lié'),
+                ),
+                if (connected) ...[
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Calendrier sélectionné'),
+                    subtitle: Text(
+                      gcal.selectedCalendarName ?? 'Aucun calendrier',
+                    ),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: _pickGoogleCalendar,
+                  ),
+                  const SizedBox(height: 4),
+                  OutlinedButton.icon(
+                    onPressed: () =>
+                        GoogleCalendarService.openGoogleCalendarApp(),
+                    icon: const Icon(Icons.open_in_new, size: 18),
+                    label: const Text('Ouvrir Google Calendar'),
+                  ),
+                  const SizedBox(height: 8),
+                  OutlinedButton(
+                    onPressed: _disconnectGoogleCalendar,
+                    child: const Text('Déconnecter'),
+                  ),
+                ] else
+                  FilledButton(
+                    onPressed: _connectGoogleCalendar,
+                    child: const Text('Connecter'),
+                  ),
+              ],
             ),
           ),
           const SizedBox(height: 24),

@@ -32,7 +32,7 @@ void main() {
     expect(find.text('Sport'), findsWidgets);
     expect(find.text('Bien-être'), findsWidgets);
     expect(find.text('Tasks'), findsWidgets);
-    expect(find.text('Puzzle'), findsWidgets);
+    expect(find.text('Plus'), findsOneWidget);
     expect(find.text('Accueil'), findsOneWidget);
   });
 }

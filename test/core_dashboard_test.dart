@@ -44,25 +44,32 @@ void main() {
     expect(find.text('Sport'), findsWidgets);
     expect(find.text('Bien-être'), findsWidgets);
     expect(find.text('Tasks'), findsWidgets);
-    expect(find.text('Puzzle'), findsWidgets);
+    expect(find.text('Plus'), findsOneWidget);
     expect(find.text('Bonjour'), findsOneWidget);
   });
 
-  testWidgets('navigation bas vers Sport / Bien-être / Tasks / Puzzle', (tester) async {
+  testWidgets('navigation bas vers Tasks / Sport / Bien-être / Plus', (tester) async {
     await tester.pumpWidget(const BloomApp());
-    await tester.pump();
-
-    await tester.tap(find.text('Sport').last);
-    await tester.pump();
-    expect(find.byType(MainShell), findsOneWidget);
-
-    await tester.tap(find.text('Bien-être').last);
     await tester.pump();
 
     await tester.tap(find.text('Tasks').last);
     await tester.pump();
+    expect(find.byType(MainShell), findsOneWidget);
+    expect(find.text('Les petites choses à faire 🌱'), findsOneWidget);
 
-    await tester.tap(find.text('Puzzle').last);
+    await tester.tap(find.text('Sport').last);
+    await tester.pump();
+
+    await tester.tap(find.text('Bien-être').last);
+    await tester.pump();
+
+    await tester.tap(find.text('Plus'));
+    await tester.pump();
+    expect(find.text('Puzzle'), findsWidgets);
+    expect(find.text('Paramètres'), findsWidgets);
+
+    // Dismiss Plus sheet.
+    Navigator.of(tester.element(find.text('Puzzle').first)).pop();
     await tester.pump();
 
     await tester.tap(find.text('Accueil'));
