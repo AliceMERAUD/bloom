@@ -8,6 +8,7 @@ import 'package:bloom/models/app_settings.dart';
 import 'package:bloom/models/wellbeing_entry.dart';
 import 'package:bloom/models/wellbeing_enums.dart';
 import 'package:bloom/screens/shell/main_shell.dart';
+import 'package:bloom/screens/tasks/tasks_screen.dart';
 import 'package:bloom/services/dashboard_service.dart';
 import 'package:bloom/services/data_export_service.dart';
 import 'package:bloom/services/puzzle_progress_service.dart';
@@ -43,27 +44,37 @@ void main() {
     expect(find.text('Accueil'), findsOneWidget);
     expect(find.text('Sport'), findsWidgets);
     expect(find.text('Bien-être'), findsWidgets);
-    expect(find.text('Tasks'), findsWidgets);
-    expect(find.text('Puzzle'), findsWidgets);
+    expect(find.text('Planning'), findsWidgets);
+    expect(find.text('Plus'), findsOneWidget);
     expect(find.text('Bonjour'), findsOneWidget);
   });
 
-  testWidgets('navigation bas vers Sport / Bien-être / Tasks / Puzzle', (tester) async {
+  testWidgets('navigation bas vers Planning / Sport / Bien-être / Plus', (tester) async {
     await tester.pumpWidget(const BloomApp());
     await tester.pump();
 
-    await tester.tap(find.text('Sport').last);
+    await tester.tap(find.text('Planning').last);
     await tester.pump();
     expect(find.byType(MainShell), findsOneWidget);
+
+    await tester.tap(find.text('Sport').last);
+    await tester.pump();
 
     await tester.tap(find.text('Bien-être').last);
     await tester.pump();
 
+    await tester.tap(find.text('Plus'));
+    await tester.pumpAndSettle();
+    expect(find.text('Tasks'), findsWidgets);
+    expect(find.text('Puzzle'), findsWidgets);
     await tester.tap(find.text('Tasks').last);
-    await tester.pump();
+    await tester.pumpAndSettle();
+    expect(find.byType(TasksScreen), findsOneWidget);
 
-    await tester.tap(find.text('Puzzle').last);
-    await tester.pump();
+    // Close Tasks route to return to shell.
+    final navigator = tester.state<NavigatorState>(find.byType(Navigator).first);
+    navigator.pop();
+    await tester.pumpAndSettle();
 
     await tester.tap(find.text('Accueil'));
     await tester.pump();
