@@ -64,6 +64,14 @@ void main() {
         GoogleOAuthFailureKind.permissionDenied.debugLabel,
         contains('Autorisation'),
       );
+      expect(
+        GoogleOAuthFailureKind.unknown.userMessage.toLowerCase(),
+        isNot(contains('internet')),
+      );
+      expect(
+        GoogleOAuthFailureKind.network.userMessage.toLowerCase(),
+        contains('internet'),
+      );
     });
   });
 

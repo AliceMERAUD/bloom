@@ -19,6 +19,11 @@ Connecter Google
   → Calendar API (access token)
 ```
 
+Sur **Android**, `canAccessScopes()` n’est **pas** appelé (non implémenté dans
+`google_sign_in_android` 6.2.x — provoquait `UnimplementedError`).
+Sur les autres plateformes, un contrôle `canAccessScopes` optionnel peut
+éviter un nouveau prompt si les scopes sont déjà accordés.
+
 Le code **n’empêche pas** d’appeler `signIn()` si le Server Client ID manque.
 Sans `google-services.json`, Play Services peut toutefois renvoyer
 `ApiException: 10` **avant** le sélecteur tant que le Client ID Web + client

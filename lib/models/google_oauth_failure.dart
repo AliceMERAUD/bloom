@@ -89,8 +89,9 @@ extension GoogleOAuthFailureKindX on GoogleOAuthFailureKind {
         return 'Session Google expirée ou token indisponible.\n'
             'Reconnecte Google Calendar dans les paramètres.';
       case GoogleOAuthFailureKind.unknown:
-        return 'Connexion Google impossible.\n'
-            'Vérifie ta connexion Internet et la configuration Google de Bloom.';
+        return 'Une erreur inattendue est survenue lors de la connexion Google.\n'
+            'Réessaie. Si le problème continue, vérifie la configuration OAuth '
+            '(docs/google_calendar_oauth.md).';
     }
   }
 }

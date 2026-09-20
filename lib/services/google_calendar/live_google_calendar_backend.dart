@@ -8,6 +8,7 @@ import 'package:googleapis_auth/googleapis_auth.dart';
 import '../../models/google_calendar.dart';
 import '../../models/google_oauth_failure.dart';
 import 'google_calendar_backend.dart';
+import 'google_calendar_scope_flow.dart';
 import 'google_sign_in_config.dart';
 
 /// Live Google Calendar API via Google Sign-In (v6).
@@ -15,6 +16,7 @@ import 'google_sign_in_config.dart';
 /// Flow:
 /// 1. `signIn()` → account picker (no Calendar scopes yet)
 /// 2. `requestScopes(calendar…)` → Calendar authorization
+///    (Android: never calls `canAccessScopes` — unimplemented on plugin 6.2.x)
 /// 3. Calendar API via access token
 class LiveGoogleCalendarBackend implements GoogleCalendarBackend {
   LiveGoogleCalendarBackend({GoogleSignIn? signIn})
@@ -59,7 +61,6 @@ class LiveGoogleCalendarBackend implements GoogleCalendarBackend {
     if (_signIn.currentUser == null) {
       _throwKind(GoogleOAuthFailureKind.tokenUnavailable);
     }
-    // Token may be missing when Web serverClientId / Android OAuth is incomplete.
     if (!GoogleSignInConfig.hasServerClientId) {
       _throwKind(GoogleOAuthFailureKind.serverClientIdMissing);
     }
@@ -84,8 +85,6 @@ class LiveGoogleCalendarBackend implements GoogleCalendarBackend {
   @override
   Future<String?> signIn() async {
     try {
-      // CRITICAL: always attempt the account picker. Do not pre-fail on
-      // missing GOOGLE_SERVER_CLIENT_ID — diagnose after Google responds.
       _log(
         'signIn → account picker '
         '(serverClientId=${GoogleSignInConfig.hasServerClientId ? "SET" : "MISSING"})',
@@ -97,16 +96,14 @@ class LiveGoogleCalendarBackend implements GoogleCalendarBackend {
       }
       _log('account selected — requesting Calendar scopes');
 
-      final already = await _signIn.canAccessScopes(
-        GoogleSignInConfig.calendarScopes,
+      final granted = await ensureCalendarScopesGranted(
+        requestScopes: _signIn.requestScopes,
+        canAccessScopes: _signIn.canAccessScopes,
+        scopes: GoogleSignInConfig.calendarScopes,
       );
-      if (!already) {
-        final granted =
-            await _signIn.requestScopes(GoogleSignInConfig.calendarScopes);
-        if (!granted) {
-          _log('requestScopes denied');
-          _throwKind(GoogleOAuthFailureKind.permissionDenied);
-        }
+      if (!granted) {
+        _log('requestScopes denied');
+        _throwKind(GoogleOAuthFailureKind.permissionDenied);
       }
       _log('Calendar scopes OK');
       return account.email;
@@ -134,21 +131,19 @@ class LiveGoogleCalendarBackend implements GoogleCalendarBackend {
       return GoogleOAuthFailureKind.cancelled;
     }
 
-    // DEVELOPER_ERROR — often before picker if Android/Web OAuth misconfigured.
     if (blob.contains('apiexception: 10') ||
         blob.contains('statuscode=10') ||
         blob.contains('developer_error')) {
       if (!GoogleSignInConfig.hasServerClientId) {
-        // Without google-services.json, missing Web client ID commonly
-        // surfaces as ApiException 10 and blocks the picker.
         return GoogleOAuthFailureKind.serverClientIdMissing;
       }
       return GoogleOAuthFailureKind.oauthAndroidMisconfigured;
     }
 
+    // Strict network signals only (ApiException 7 / network_error).
     if (blob.contains('apiexception: 7') ||
-        blob.contains('network_error') ||
-        (blob.contains('network') && !blob.contains('developer'))) {
+        code == 'network_error' ||
+        blob.contains('network_error')) {
       return GoogleOAuthFailureKind.network;
     }
 
@@ -168,7 +163,18 @@ class LiveGoogleCalendarBackend implements GoogleCalendarBackend {
     return GoogleOAuthFailureKind.unknown;
   }
 
+  @visibleForTesting
+  GoogleOAuthFailureKind classifyGenericForTest(Object e) =>
+      _classifyGeneric(e);
+
+  @visibleForTesting
+  GoogleOAuthFailureKind classifyPlatformForTest(PlatformException e) =>
+      _classifyPlatform(e);
+
   GoogleOAuthFailureKind _classifyGeneric(Object e) {
+    if (e is UnimplementedError) {
+      return GoogleOAuthFailureKind.unknown;
+    }
     final blob = e.toString().toLowerCase();
     if (blob.contains('access_not_configured') ||
         blob.contains('calendar has not been used') ||
@@ -181,16 +187,15 @@ class LiveGoogleCalendarBackend implements GoogleCalendarBackend {
       }
       return GoogleOAuthFailureKind.oauthAndroidMisconfigured;
     }
-    if (blob.contains('invalid_client') || blob.contains('unauthorized_client')) {
+    if (blob.contains('invalid_client') ||
+        blob.contains('unauthorized_client')) {
       return GoogleOAuthFailureKind.serverClientIdInvalid;
     }
-    if (blob.contains('socket') ||
-        blob.contains('network') ||
-        blob.contains('failed host lookup')) {
+    if (blob.contains('socketexception') ||
+        blob.contains('failed host lookup') ||
+        blob.contains('network is unreachable') ||
+        blob.contains('connection timed out')) {
       return GoogleOAuthFailureKind.network;
-    }
-    if (!GoogleSignInConfig.hasServerClientId) {
-      return GoogleOAuthFailureKind.serverClientIdMissing;
     }
     return GoogleOAuthFailureKind.unknown;
   }
@@ -227,10 +232,11 @@ class LiveGoogleCalendarBackend implements GoogleCalendarBackend {
       rethrow;
     } catch (e) {
       _log('listCalendars failed', e);
+      final kind = _classifyGeneric(e);
       throw GoogleCalendarException(
-        GoogleOAuthFailure.fromKind(_classifyGeneric(e)).userMessage,
+        GoogleOAuthFailure.fromKind(kind).userMessage,
         e,
-        _classifyGeneric(e),
+        kind,
       );
     }
   }
@@ -285,7 +291,7 @@ class LiveGoogleCalendarBackend implements GoogleCalendarBackend {
       _log('createEvent failed', e);
       throw GoogleCalendarException(
         'Impossible d’ajouter l’événement à Google Calendar.\n'
-        'Vérifie ta connexion puis réessaie.',
+        'Réessaie dans un instant.',
         e,
         _classifyGeneric(e),
       );
