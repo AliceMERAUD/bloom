@@ -6,6 +6,7 @@ import '../../services/wellbeing_service.dart';
 import 'wellbeing_entry_screen.dart';
 import 'wellbeing_history_screen.dart';
 import 'wellbeing_insights_screen.dart';
+import 'wellbeing_month_calendar.dart';
 
 class WellbeingScreen extends StatefulWidget {
   const WellbeingScreen({super.key});
@@ -182,7 +183,7 @@ class _WellbeingScreenState extends State<WellbeingScreen> {
                     ),
             ),
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 16),
           SizedBox(
             height: 54,
             child: FilledButton.icon(
@@ -193,6 +194,13 @@ class _WellbeingScreenState extends State<WellbeingScreen> {
                 style: const TextStyle(fontSize: 17),
               ),
             ),
+          ),
+          const SizedBox(height: 24),
+          WellbeingMonthCalendar(
+            onDaySelected: (date) async {
+              await openWellbeingDay(context, date);
+              if (mounted) _reload();
+            },
           ),
         ],
       ),

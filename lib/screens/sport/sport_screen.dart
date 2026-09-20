@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
 
+import '../../app/theme.dart';
 import '../../models/sport_activity.dart';
+import '../../services/dashboard_service.dart';
 import '../../services/exercise_service.dart';
 import '../../services/sport_activity_service.dart';
 import '../../services/workout_session_service.dart';
+import '../../widgets/common/bloom_widgets.dart';
 import 'exercise_screen.dart';
 import 'history_screen.dart';
 import 'next_session_screen.dart';
+import 'progress_screen.dart';
 import 'sport_activities_screen.dart';
 import 'sport_activity_form_screen.dart';
 import 'sport_bag_screen.dart';
@@ -16,10 +20,10 @@ class SportScreen extends StatefulWidget {
   const SportScreen({super.key});
 
   @override
-  State<SportScreen> createState() => _SportScreenState();
+  State<SportScreen> createState() => SportScreenState();
 }
 
-class _SportScreenState extends State<SportScreen> {
+class SportScreenState extends State<SportScreen> {
   bool hasOpenSession = false;
   List<SportActivity> _activities = [];
 
@@ -56,6 +60,9 @@ class _SportScreenState extends State<SportScreen> {
       hasOpenSession = WorkoutSessionService.hasOpenSession;
     });
   }
+
+  /// Used by Home shortcuts to jump into a musculation session.
+  Future<void> startSessionFromShortcut() => _startSessionPressed();
 
   Future<void> _startSessionPressed() async {
     final result = await WorkoutSessionService.startSession();
@@ -263,6 +270,8 @@ class _SportScreenState extends State<SportScreen> {
                 ),
               ),
             ),
+          const _TractionGoalCard(),
+          const SizedBox(height: 12),
           Row(
             children: [
               Expanded(
@@ -415,4 +424,73 @@ enum _OpenSessionChoice {
   resume,
   replace,
   cancel,
+}
+
+class _TractionGoalCard extends StatelessWidget {
+  const _TractionGoalCard();
+
+  @override
+  Widget build(BuildContext context) {
+    TractionProgressSummary? summary;
+    try {
+      summary = DashboardService.load().tractionProgress;
+    } catch (_) {
+      summary = null;
+    }
+
+    final hasData = summary?.hasData == true;
+    String body;
+    if (!hasData) {
+      body = 'Commence une séance pour suivre ta progression.';
+    } else if (summary!.previousAssistance != null &&
+        summary.latestAssistance != null) {
+      body =
+          'Dernière progression : ${summary.previousAssistance!.toStringAsFixed(1)} kg → '
+          '${summary.latestAssistance!.toStringAsFixed(1)} kg d’assistance\n'
+          'Continue comme ça !';
+    } else {
+      body =
+          'Dernière assistance : ${summary.latestAssistance!.toStringAsFixed(1)} kg\n'
+          'Continue comme ça !';
+    }
+
+    return BloomCard(
+      accent: BloomTheme.sport,
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => const ProgressScreen(exerciseId: 'pull_up_assisted'),
+          ),
+        );
+      },
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: BloomTheme.sport.withValues(alpha: 0.14),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.fitness_center, color: BloomTheme.sport),
+              ),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Text(
+                  '💪 Traction stricte',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                ),
+              ),
+              const Icon(Icons.chevron_right),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(body),
+        ],
+      ),
+    );
+  }
 }

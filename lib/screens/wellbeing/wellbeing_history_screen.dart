@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 
+import '../../app/theme.dart';
 import '../../models/wellbeing_entry.dart';
 import '../../models/wellbeing_enums.dart';
 import '../../services/wellbeing_service.dart';
+import '../../widgets/common/bloom_widgets.dart';
 import 'wellbeing_entry_screen.dart';
 
 class WellbeingHistoryScreen extends StatefulWidget {
@@ -48,9 +50,12 @@ class _WellbeingHistoryScreenState extends State<WellbeingHistoryScreen> {
       ),
       body: entries.isEmpty
           ? const Center(
-              child: Text(
-                'Aucune journée enregistrée pour le moment.',
-                textAlign: TextAlign.center,
+              child: Padding(
+                padding: EdgeInsets.all(24),
+                child: Text(
+                  'Aucune journée enregistrée pour le moment.',
+                  textAlign: TextAlign.center,
+                ),
               ),
             )
           : ListView.builder(
@@ -58,23 +63,30 @@ class _WellbeingHistoryScreenState extends State<WellbeingHistoryScreen> {
               itemCount: entries.length,
               itemBuilder: (context, index) {
                 final entry = entries[index];
-
-                return Card(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  child: ListTile(
-                    title: Text(
-                      _formatDate(entry.date),
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    subtitle: Text(
-                      'Humeur : ${entry.mood?.label ?? '—'} • '
-                      'Énergie : ${entry.energy?.label ?? '—'}\n'
-                      'Douleur : ${entry.pain.label} • '
-                      'Cycle : ${_cycleLabel(entry)}',
-                    ),
-                    isThreeLine: true,
-                    trailing: const Icon(Icons.chevron_right),
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: BloomCard(
+                    accent: BloomTheme.wellbeing,
                     onTap: () => _openEntry(entry),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '📅 ${_formatDate(entry.date)}',
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 8),
+                        Text('🌸 Humeur : ${entry.mood?.label ?? '—'}'),
+                        Text('⚡ Énergie : ${entry.energy?.label ?? '—'}'),
+                        Text('🩸 Saignement : ${entry.bleeding.label}'),
+                        if (entry.pain != Pain.none)
+                          Text('Douleur : ${entry.pain.label}'),
+                        if (entry.symptoms.isNotEmpty)
+                          Text(
+                            'Symptômes : ${entry.symptoms.map((s) => s.label).join(', ')}',
+                          ),
+                      ],
+                    ),
                   ),
                 );
               },
@@ -82,20 +94,21 @@ class _WellbeingHistoryScreenState extends State<WellbeingHistoryScreen> {
     );
   }
 
-  String _cycleLabel(WellbeingEntry entry) {
-    switch (entry.periodMarker) {
-      case PeriodMarker.start:
-        return 'Début';
-      case PeriodMarker.end:
-        return 'Fin';
-      case PeriodMarker.none:
-        return entry.bleeding.isPresent ? entry.bleeding.label : '—';
-    }
-  }
-
-  String _formatDate(DateTime value) {
-    return '${value.day.toString().padLeft(2, '0')}/'
-        '${value.month.toString().padLeft(2, '0')}/'
-        '${value.year}';
+  String _formatDate(DateTime date) {
+    final months = const [
+      'janvier',
+      'février',
+      'mars',
+      'avril',
+      'mai',
+      'juin',
+      'juillet',
+      'août',
+      'septembre',
+      'octobre',
+      'novembre',
+      'décembre',
+    ];
+    return '${date.day} ${months[date.month - 1]}';
   }
 }

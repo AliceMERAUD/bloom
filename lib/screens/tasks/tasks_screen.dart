@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 
+import '../../models/sport_activity.dart';
 import '../../models/task.dart';
+import '../../services/sport_activity_service.dart';
 import '../../services/task_service.dart';
 import '../../widgets/common/bloom_widgets.dart';
+import '../sport/sport_activity_form_screen.dart';
+import '../sport/sport_bag_checklist_sheet.dart';
 import 'task_form_screen.dart';
 
 enum _TaskFilter { all, pending, completed }
@@ -52,6 +56,72 @@ class _TasksScreenState extends State<TasksScreen> {
       list = list.where((t) => t.category == _categoryFilter).toList();
     }
     return list;
+  }
+
+  bool get _shouldGroup =>
+      _filter == _TaskFilter.pending || _filter == _TaskFilter.all;
+
+  List<Widget> _buildGroupedList(List<BloomTask> tasks) {
+    final pending = tasks.where((t) => t.isPending).toList();
+    final completed = tasks.where((t) => t.completed).toList();
+
+    final overdue = pending.where((t) => t.isOverdue).toList();
+    final today = pending
+        .where((t) => t.isDueToday && !t.isOverdue)
+        .toList();
+    final upcoming = pending.where((t) {
+      if (t.dueDate == null || t.isOverdue || t.isDueToday) return false;
+      final now = DateTime.now();
+      final due = DateTime(t.dueDate!.year, t.dueDate!.month, t.dueDate!.day);
+      final todayDate = DateTime(now.year, now.month, now.day);
+      return due.isAfter(todayDate);
+    }).toList();
+    final noDue = pending.where((t) => t.dueDate == null).toList();
+
+    final sections = <Widget>[];
+
+    void addSection(String title, List<BloomTask> items, {Color? accent}) {
+      if (items.isEmpty) return;
+      sections.add(
+        Padding(
+          padding: EdgeInsets.only(top: sections.isEmpty ? 0 : 8, bottom: 8),
+          child: Text(
+            title,
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: accent ?? Theme.of(context).colorScheme.primary,
+                ),
+          ),
+        ),
+      );
+      for (final task in items) {
+        sections.add(
+          Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: _TaskTile(
+              task: task,
+              onOpen: () => _openForm(task: task),
+              onToggle: () => _toggleComplete(task),
+            ),
+          ),
+        );
+      }
+    }
+
+    addSection(
+      'En retard',
+      overdue,
+      accent: Theme.of(context).colorScheme.error,
+    );
+    addSection('Aujourd’hui', today);
+    addSection('À venir', upcoming);
+    addSection('Sans échéance', noDue);
+
+    if (_filter == _TaskFilter.all && completed.isNotEmpty) {
+      addSection('Terminées', completed);
+    }
+
+    return sections;
   }
 
   @override
@@ -165,6 +235,8 @@ class _TasksScreenState extends State<TasksScreen> {
                 actionLabel: 'Créer une tâche',
                 onAction: () => _openForm(),
               )
+            else if (_shouldGroup)
+              ..._buildGroupedList(tasks)
             else
               ...tasks.map(
                 (task) => Padding(
@@ -216,6 +288,11 @@ class _TaskTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final overdue = task.isOverdue;
+    final SportActivity? sport = task.sportId == null
+        ? null
+        : SportActivityService.getById(task.sportId!);
+    final icon = sport?.icon ?? task.category.icon;
+    final categoryLabel = sport?.name ?? task.category.label;
 
     return BloomCard(
       onTap: onOpen,
@@ -250,11 +327,11 @@ class _TaskTile extends StatelessWidget {
                 const SizedBox(height: 4),
                 Row(
                   children: [
-                    Icon(task.category.icon, size: 14),
+                    Icon(icon, size: 14),
                     const SizedBox(width: 4),
                     Flexible(
                       child: Text(
-                        '${task.category.label} · ${_dueLabel()}',
+                        '$categoryLabel · ${_dueLabel()}',
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
                               color: overdue ? scheme.error : null,
                               fontWeight: overdue ? FontWeight.w600 : null,
@@ -275,6 +352,30 @@ class _TaskTile extends StatelessWidget {
               ],
             ),
           ),
+          if (task.sportId != null) ...[
+            IconButton(
+              tooltip: 'Voir le sport',
+              icon: const Icon(Icons.fitness_center_outlined),
+              onPressed: sport == null
+                  ? null
+                  : () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) =>
+                              SportActivityFormScreen(activity: sport),
+                        ),
+                      );
+                    },
+            ),
+            IconButton(
+              tooltip: 'Checklist du sac',
+              icon: const Icon(Icons.shopping_bag_outlined),
+              onPressed: () => showSportBagChecklistSheet(
+                context,
+                sportId: task.sportId,
+              ),
+            ),
+          ],
         ],
       ),
     );

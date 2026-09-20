@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
 
 import '../../services/bloom_refresh.dart';
+import '../../services/puzzle_progress_service.dart';
 import '../home/home_screen.dart';
+import '../puzzle/puzzle_play_screen.dart';
 import '../puzzle/puzzle_screen.dart';
 import '../settings/settings_screen.dart';
 import '../sport/sport_screen.dart';
+import '../tasks/task_form_screen.dart';
 import '../tasks/tasks_screen.dart';
+import '../wellbeing/wellbeing_entry_screen.dart';
 import '../wellbeing/wellbeing_screen.dart';
 
 /// Root shell: Home / Sport / Wellbeing / Tasks / Puzzle.
@@ -20,6 +24,7 @@ class MainShell extends StatefulWidget {
 
 class MainShellState extends State<MainShell> {
   late int _index;
+  final GlobalKey<SportScreenState> _sportKey = GlobalKey<SportScreenState>();
 
   @override
   void initState() {
@@ -33,6 +38,13 @@ class MainShellState extends State<MainShell> {
       BloomRefresh.notify();
     }
     setState(() => _index = next);
+  }
+
+  Future<void> _startSessionShortcut() async {
+    goToTab(1);
+    // Let the Sport tab become visible before triggering the session flow.
+    await Future<void>.delayed(const Duration(milliseconds: 50));
+    await _sportKey.currentState?.startSessionFromShortcut();
   }
 
   @override
@@ -51,8 +63,39 @@ class MainShellState extends State<MainShell> {
                 MaterialPageRoute(builder: (_) => const SettingsScreen()),
               );
             },
+            onAddTask: () async {
+              await Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const TaskFormScreen()),
+              );
+              BloomRefresh.notify();
+            },
+            onAddWellbeing: () async {
+              await Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => WellbeingEntryScreen(
+                    initialDate: DateTime.now(),
+                  ),
+                ),
+              );
+              BloomRefresh.notify();
+            },
+            onContinuePuzzle: () {
+              final id = PuzzleProgressService.load().nextPlayableId;
+              if (id == null) {
+                goToTab(4);
+                return;
+              }
+              Navigator.of(context)
+                  .push(
+                    MaterialPageRoute(
+                      builder: (_) => PuzzlePlayScreen(puzzleId: id),
+                    ),
+                  )
+                  .then((_) => BloomRefresh.notify());
+            },
+            onStartSession: _startSessionShortcut,
           ),
-          const SportScreen(),
+          SportScreen(key: _sportKey),
           const WellbeingScreen(),
           const TasksScreen(),
           const PuzzleScreen(),
