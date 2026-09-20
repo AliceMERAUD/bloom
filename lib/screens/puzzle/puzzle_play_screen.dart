@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 
+import '../../app/theme.dart';
 import '../../models/puzzle/puzzle.dart';
 import '../../models/puzzle/puzzle_models.dart';
 import '../../models/puzzle/puzzle_scene.dart';
 import '../../services/bloom_refresh.dart';
 import '../../services/puzzle_catalog.dart';
 import '../../services/puzzle_progress_service.dart';
+import '../../widgets/common/bloom_widgets.dart';
 import '../../widgets/puzzle/puzzle_character_widget.dart';
 import '../../widgets/puzzle/puzzle_constraint_feedback.dart';
 import '../../widgets/puzzle/puzzle_scene_board.dart';
@@ -22,7 +24,8 @@ class PuzzlePlayScreen extends StatefulWidget {
   State<PuzzlePlayScreen> createState() => PuzzlePlayScreenState();
 }
 
-class PuzzlePlayScreenState extends State<PuzzlePlayScreen> {
+class PuzzlePlayScreenState extends State<PuzzlePlayScreen>
+    with SingleTickerProviderStateMixin {
   /// When true, skips Hive writes (widget tests).
   @visibleForTesting
   static bool suppressPersistence = false;
@@ -33,6 +36,8 @@ class PuzzlePlayScreenState extends State<PuzzlePlayScreen> {
   PuzzleValidationResult? lastResult;
   bool solved = false;
   int _hintLevel = 0;
+  int hintsUsed = 0;
+  late final AnimationController _verifyPulse;
 
   @override
   void initState() {
@@ -40,6 +45,19 @@ class PuzzlePlayScreenState extends State<PuzzlePlayScreen> {
     puzzle = PuzzleCatalog.byId(widget.puzzleId);
     final saved = PuzzleProgressService.load().placements[widget.puzzleId];
     placement = saved ?? const PuzzlePlacement();
+    _verifyPulse = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 180),
+      lowerBound: 0.96,
+      upperBound: 1.0,
+      value: 1.0,
+    );
+  }
+
+  @override
+  void dispose() {
+    _verifyPulse.dispose();
+    super.dispose();
   }
 
   void _schedulePersist() {
@@ -55,7 +73,6 @@ class PuzzlePlayScreenState extends State<PuzzlePlayScreen> {
     });
   }
 
-  /// Exposed for widget tests (avoids flaky hit-testing with animated trays).
   @visibleForTesting
   void debugSelectCharacter(String characterId) => _selectCharacter(characterId);
 
@@ -68,6 +85,9 @@ class PuzzlePlayScreenState extends State<PuzzlePlayScreen> {
 
   @visibleForTesting
   void debugReset() => _reset();
+
+  @visibleForTesting
+  void debugNextPuzzle() => _nextPuzzle();
 
   void _tapSeat(int index) {
     final occupant = placement.characterAt(index);
@@ -117,6 +137,7 @@ class PuzzlePlayScreenState extends State<PuzzlePlayScreen> {
       lastResult = null;
       solved = false;
       _hintLevel = 0;
+      hintsUsed = 0;
     });
     if (!suppressPersistence) {
       PuzzleProgressService.clearPlacement(puzzle.id);
@@ -128,8 +149,7 @@ class PuzzlePlayScreenState extends State<PuzzlePlayScreen> {
         PuzzleHintService.describeHint(puzzle, placement, _hintLevel);
 
     if (_hintLevel >= 2) {
-      final revealed =
-          PuzzleHintService.applyRevealHint(puzzle, placement);
+      final revealed = PuzzleHintService.applyRevealHint(puzzle, placement);
       if (revealed != null) {
         setState(() {
           placement = revealed;
@@ -147,11 +167,15 @@ class PuzzlePlayScreenState extends State<PuzzlePlayScreen> {
     );
 
     setState(() {
+      hintsUsed += 1;
       _hintLevel = (_hintLevel + 1) % 3;
     });
   }
 
-  void _verify({bool showSuccessDialog = true}) {
+  Future<void> _verify({bool showSuccessDialog = true}) async {
+    await _verifyPulse.reverse();
+    await _verifyPulse.forward();
+
     final result = PuzzleValidator.validate(
       puzzle: puzzle,
       placement: placement,
@@ -168,23 +192,7 @@ class PuzzlePlayScreenState extends State<PuzzlePlayScreen> {
         BloomRefresh.notify();
       }
       if (!mounted || !showSuccessDialog) return;
-      showDialog<void>(
-        context: context,
-        builder: (dialogContext) {
-          return AlertDialog(
-            title: const Text('Bravo !'),
-            content: const Text(
-              'Toutes les contraintes sont respectées. Tu peux passer au suivant.',
-            ),
-            actions: [
-              FilledButton(
-                onPressed: () => Navigator.pop(dialogContext),
-                child: const Text('Continuer'),
-              ),
-            ],
-          );
-        },
-      );
+      await _showSuccessSheet();
     } else if (!result.isComplete) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -194,14 +202,161 @@ class PuzzlePlayScreenState extends State<PuzzlePlayScreen> {
       );
     } else {
       if (!mounted) return;
-      final failed = result.failedConstraints;
-      final text = failed.isEmpty
-          ? 'Incorrect'
-          : failed.map((c) => c.description).join('\n');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(text)),
-      );
+      await _showFailureSheet(result);
     }
+  }
+
+  Future<void> _showSuccessSheet() async {
+    final index = PuzzleCatalog.indexOf(puzzle.id);
+    final isLast = index >= PuzzleCatalog.all.length - 1;
+    final progress = PuzzleProgressService.load();
+    final completed = progress.completedIds.length;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (ctx) {
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(24, 8, 24, 28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('🎉', style: TextStyle(fontSize: 42)),
+              const SizedBox(height: 8),
+              Text(
+                isLast
+                    ? 'Bravo ! Tu as terminé tous les puzzles !'
+                    : 'Bravo !',
+                textAlign: TextAlign.center,
+                style: Theme.of(ctx).textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: BloomTheme.puzzle,
+                    ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                isLast
+                    ? 'Quelle belle série de raisonnements 🌱'
+                    : 'Toutes les contraintes sont respectées.',
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                alignment: WrapAlignment.center,
+                children: [
+                  BloomBadge(
+                    label: 'Progression $completed / ${PuzzleCatalog.all.length}',
+                    color: BloomTheme.puzzle,
+                  ),
+                  BloomBadge(
+                    label: hintsUsed == 0
+                        ? 'Sans indice'
+                        : '$hintsUsed indice(s)',
+                    color: BloomTheme.accentGreen,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              if (isLast)
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      Navigator.pop(context);
+                    },
+                    child: const Text('Retour aux puzzles'),
+                  ),
+                )
+              else
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: BloomTheme.puzzle,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                    ),
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      _nextPuzzle();
+                    },
+                    child: const Text('Puzzle suivant →'),
+                  ),
+                ),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Rester ici'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _showFailureSheet(PuzzleValidationResult result) async {
+    final failed = result.failedConstraints;
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (ctx) {
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(24, 8, 24, 28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '🤔 Pas encore !',
+                style: Theme.of(ctx).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                failed.isEmpty
+                    ? 'La disposition n’est pas correcte.'
+                    : '${failed.length} contrainte(s) ne sont pas respectées.',
+              ),
+              if (failed.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                ...failed.take(4).map(
+                      (c) => Padding(
+                        padding: const EdgeInsets.only(bottom: 6),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('• '),
+                            Expanded(child: Text(_humanize(c.description))),
+                          ],
+                        ),
+                      ),
+                    ),
+              ],
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Continuer'),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  String _humanize(String raw) {
+    var text = raw;
+    for (final character in puzzle.characters) {
+      text = text.replaceAll(character.id, character.name);
+    }
+    return text;
   }
 
   void _nextPuzzle() {
@@ -213,7 +368,7 @@ class PuzzlePlayScreenState extends State<PuzzlePlayScreen> {
 
     final next = PuzzleCatalog.all[index + 1];
     final progress = PuzzleProgressService.load();
-    if (!progress.isUnlocked(next.id)) {
+    if (!progress.isUnlocked(next.id) && !solved) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Termine ce puzzle pour débloquer le suivant.'),
@@ -224,8 +379,12 @@ class PuzzlePlayScreenState extends State<PuzzlePlayScreen> {
 
     Navigator.pushReplacement(
       context,
-      MaterialPageRoute(
-        builder: (_) => PuzzlePlayScreen(puzzleId: next.id),
+      PageRouteBuilder(
+        pageBuilder: (_, __, ___) => PuzzlePlayScreen(puzzleId: next.id),
+        transitionsBuilder: (_, animation, __, child) {
+          return FadeTransition(opacity: animation, child: child);
+        },
+        transitionDuration: const Duration(milliseconds: 220),
       ),
     );
   }
@@ -239,6 +398,8 @@ class PuzzlePlayScreenState extends State<PuzzlePlayScreen> {
         .toList();
     final scene = PuzzleSceneTheme.forScenario(puzzle.scenario);
     final canGoNext = solved || progress.isCompleted(puzzle.id);
+    final isLast = PuzzleCatalog.indexOf(puzzle.id) >=
+        PuzzleCatalog.all.length - 1;
 
     return Scaffold(
       appBar: AppBar(
@@ -252,9 +413,9 @@ class PuzzlePlayScreenState extends State<PuzzlePlayScreen> {
           Padding(
             padding: const EdgeInsets.only(right: 12),
             child: Center(
-              child: Text(
-                '$puzzleIndex / ${PuzzleCatalog.all.length}',
-                style: const TextStyle(fontWeight: FontWeight.w600),
+              child: BloomBadge(
+                label: '$puzzleIndex / ${PuzzleCatalog.all.length}',
+                color: BloomTheme.puzzle,
               ),
             ),
           ),
@@ -265,17 +426,23 @@ class PuzzlePlayScreenState extends State<PuzzlePlayScreen> {
           children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-              child: Row(
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 6,
                 children: [
-                  Chip(
-                    label: Text(puzzle.difficulty.label),
-                    visualDensity: VisualDensity.compact,
+                  BloomBadge(
+                    label: puzzle.difficulty.label,
+                    color: BloomTheme.puzzle,
                   ),
-                  const SizedBox(width: 8),
-                  Chip(
-                    avatar: Icon(scene.motifIcon, size: 16),
-                    label: Text(scene.title),
-                    visualDensity: VisualDensity.compact,
+                  BloomBadge(
+                    label: scene.title,
+                    color: scene.accentColor,
+                  ),
+                  BloomBadge(
+                    label: hintsUsed == 0
+                        ? 'Indices : 0'
+                        : 'Indices : $hintsUsed',
+                    color: BloomTheme.accentGreen,
                   ),
                 ],
               ),
@@ -291,11 +458,15 @@ class PuzzlePlayScreenState extends State<PuzzlePlayScreen> {
               flex: 5,
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 12),
-                child: PuzzleSceneBoard(
-                  puzzle: puzzle,
-                  placement: placement,
-                  selectedCharacterId: selectedCharacterId,
-                  onTapSeat: _tapSeat,
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 180),
+                  child: PuzzleSceneBoard(
+                    key: ValueKey(placement.seats.toString()),
+                    puzzle: puzzle,
+                    placement: placement,
+                    selectedCharacterId: selectedCharacterId,
+                    onTapSeat: _tapSeat,
+                  ),
                 ),
               ),
             ),
@@ -305,7 +476,7 @@ class PuzzlePlayScreenState extends State<PuzzlePlayScreen> {
                 alignment: Alignment.centerLeft,
                 child: Text(
                   unplaced.isEmpty
-                      ? 'Tous les personnages sont placés'
+                      ? '✨ Tous les personnages sont placés'
                       : 'Personnages à placer',
                   style: const TextStyle(fontWeight: FontWeight.bold),
                 ),
@@ -347,14 +518,6 @@ class PuzzlePlayScreenState extends State<PuzzlePlayScreen> {
                 ],
               ),
             ),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16),
-              child: Text(
-                'Touche un personnage puis une place. '
-                'Retouche pour retirer ou échanger.',
-                style: TextStyle(fontSize: 12),
-              ),
-            ),
             Expanded(
               flex: 3,
               child: SingleChildScrollView(
@@ -379,21 +542,26 @@ class PuzzlePlayScreenState extends State<PuzzlePlayScreen> {
                       ),
                       const SizedBox(width: 12),
                       Expanded(
-                        child: FilledButton(
-                          onPressed: _verify,
-                          child: const Text('Vérifier'),
+                        child: ScaleTransition(
+                          scale: _verifyPulse,
+                          child: FilledButton(
+                            onPressed: _verify,
+                            child: const Text('Vérifier'),
+                          ),
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 8),
-                  SizedBox(
-                    width: double.infinity,
-                    child: FilledButton.tonal(
-                      onPressed: canGoNext ? _nextPuzzle : null,
-                      child: const Text('Puzzle suivant'),
+                  if (canGoNext && !isLast) ...[
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton.tonal(
+                        onPressed: _nextPuzzle,
+                        child: const Text('Puzzle suivant →'),
+                      ),
                     ),
-                  ),
+                  ],
                 ],
               ),
             ),

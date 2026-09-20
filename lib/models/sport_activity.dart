@@ -11,6 +11,12 @@ class SportActivity {
   final bool enabled;
   final bool builtin;
 
+  /// Per-sport local reminder preferences.
+  final bool notificationEnabled;
+  final String? notificationMessage;
+  final String? notificationBagMessage;
+  final int notificationMinutesBefore;
+
   const SportActivity({
     required this.id,
     required this.name,
@@ -20,11 +26,59 @@ class SportActivity {
     required this.createdAt,
     this.enabled = true,
     this.builtin = false,
+    this.notificationEnabled = true,
+    this.notificationMessage,
+    this.notificationBagMessage,
+    this.notificationMinutesBefore = 30,
   });
 
   IconData get icon => sportIconFromName(iconName);
 
   Color get color => Color(colorValue);
+
+  /// Default body when no custom message is set.
+  String defaultNotificationMessage({int? minutesBefore}) {
+    final mins = minutesBefore ?? notificationMinutesBefore;
+    final lead = mins <= 0 ? 'C’est l’heure' : 'Dans $mins min';
+    switch (iconName) {
+      case 'fitness_center':
+        return '💪 $lead de ta séance ! Prête à soulever du lourd ?';
+      case 'pool':
+        return '🏊 Piscine${mins > 0 ? ' dans $mins min' : ''} ! '
+            'N’oublie pas ton maillot et ta serviette.';
+      case 'sports_handball':
+        return '🤾 C’est l’heure du hand ! Vérifie ton sac avant de partir.';
+      case 'directions_run':
+        return '🏃 $lead de ta course !';
+      case 'directions_bike':
+        return '🚴 $lead du vélo !';
+      case 'self_improvement':
+        return '🧘 $lead de ton yoga / détente.';
+      case 'sports_tennis':
+        return '🎾 $lead du tennis !';
+      case 'music_note':
+        return '💃 $lead de la danse !';
+      default:
+        return '🏅 $lead — $name !';
+    }
+  }
+
+  String defaultBagMessage() =>
+      notificationBagMessage?.trim().isNotEmpty == true
+          ? notificationBagMessage!.trim()
+          : 'Pense à ton sac !';
+
+  String resolvedNotificationBody({required bool includeBagHint}) {
+    final base = notificationMessage?.trim().isNotEmpty == true
+        ? notificationMessage!.trim()
+        : defaultNotificationMessage();
+    if (!includeBagHint) return base;
+    final bag = defaultBagMessage();
+    if (base.contains(bag) || base.toLowerCase().contains('sac')) {
+      return base;
+    }
+    return '$base $bag';
+  }
 
   SportActivity copyWith({
     String? name,
@@ -32,7 +86,13 @@ class SportActivity {
     String? iconName,
     int? colorValue,
     bool? enabled,
+    bool? notificationEnabled,
+    String? notificationMessage,
+    String? notificationBagMessage,
+    int? notificationMinutesBefore,
     bool clearDescription = false,
+    bool clearNotificationMessage = false,
+    bool clearNotificationBagMessage = false,
   }) {
     return SportActivity(
       id: id,
@@ -44,6 +104,15 @@ class SportActivity {
       createdAt: createdAt,
       enabled: enabled ?? this.enabled,
       builtin: builtin,
+      notificationEnabled: notificationEnabled ?? this.notificationEnabled,
+      notificationMessage: clearNotificationMessage
+          ? null
+          : (notificationMessage ?? this.notificationMessage),
+      notificationBagMessage: clearNotificationBagMessage
+          ? null
+          : (notificationBagMessage ?? this.notificationBagMessage),
+      notificationMinutesBefore:
+          notificationMinutesBefore ?? this.notificationMinutesBefore,
     );
   }
 
@@ -56,6 +125,10 @@ class SportActivity {
         'createdAt': createdAt.toIso8601String(),
         'enabled': enabled,
         'builtin': builtin,
+        'notificationEnabled': notificationEnabled,
+        'notificationMessage': notificationMessage,
+        'notificationBagMessage': notificationBagMessage,
+        'notificationMinutesBefore': notificationMinutesBefore,
       };
 
   factory SportActivity.fromMap(Map<dynamic, dynamic> map) {
@@ -69,6 +142,11 @@ class SportActivity {
       createdAt: DateTime.parse(data['createdAt'] as String),
       enabled: data['enabled'] as bool? ?? true,
       builtin: data['builtin'] as bool? ?? false,
+      notificationEnabled: data['notificationEnabled'] as bool? ?? true,
+      notificationMessage: data['notificationMessage'] as String?,
+      notificationBagMessage: data['notificationBagMessage'] as String?,
+      notificationMinutesBefore:
+          (data['notificationMinutesBefore'] as num?)?.toInt() ?? 30,
     );
   }
 }
@@ -102,7 +180,6 @@ IconData sportIconFromName(String name) {
 
 const kBuiltinStrengthSportId = 'strength';
 
-/// Icons offered in the create/edit sport form.
 const kSportIconChoices = <String>[
   'sports',
   'fitness_center',
@@ -116,3 +193,5 @@ const kSportIconChoices = <String>[
   'terrain',
   'sports_soccer',
 ];
+
+const kSportReminderLeadChoices = <int>[0, 15, 30, 60];

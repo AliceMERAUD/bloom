@@ -145,15 +145,15 @@ void main() {
     await tester.pump();
 
     state.debugVerify(showSuccessDialog: true);
-    await tester.pump();
+    await tester.pumpAndSettle();
 
     expect(state.solved, isTrue);
     expect(find.text('Respectée'), findsWidgets);
-    expect(find.text('Bravo !'), findsOneWidget);
+    expect(find.textContaining('Bravo'), findsWidgets);
 
-    await tester.tap(find.text('Continuer'));
-    await tester.pump();
-    expect(find.text('Bravo !'), findsNothing);
+    await tester.tap(find.text('Rester ici'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Bravo'), findsNothing);
   });
 
   testWidgets('réinitialiser vide le plateau', (tester) async {
@@ -188,11 +188,16 @@ void main() {
     await tester.pump();
 
     state.debugVerify(showSuccessDialog: true);
-    await tester.pump();
+    await tester.pumpAndSettle();
 
     expect(state.solved, isFalse);
     expect(find.text('Bravo !'), findsNothing);
+    expect(find.textContaining('Pas encore'), findsOneWidget);
     expect(find.text('Non respectée'), findsWidgets);
+    expect(state.placement.seats.length, puzzle.seatCount);
+
+    await tester.tap(find.text('Continuer'));
+    await tester.pumpAndSettle();
     expect(state.placement.seats.length, puzzle.seatCount);
   });
 

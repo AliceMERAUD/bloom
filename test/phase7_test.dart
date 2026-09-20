@@ -102,8 +102,13 @@ void main() {
       expect(fire.minute, 30);
 
       final copy = TaskService.notificationCopyFor(task);
-      expect(copy.$1, contains('Sport'));
-      expect(copy.$2, contains('sac'));
+      expect(copy.$1, contains('Natation'));
+      expect(
+        copy.$2.toLowerCase().contains('sac') ||
+            copy.$2.contains('maillot') ||
+            copy.$2.contains('Piscine'),
+        isTrue,
+      );
     });
 
     test('notifications désactivées ne bloquent pas la création', () async {
