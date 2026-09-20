@@ -4,16 +4,16 @@ import '../../app/theme.dart';
 import '../../services/bloom_refresh.dart';
 import '../../services/puzzle_progress_service.dart';
 import '../home/home_screen.dart';
-import '../planning/planning_screen.dart';
 import '../puzzle/puzzle_play_screen.dart';
 import '../puzzle/puzzle_screen.dart';
 import '../settings/settings_screen.dart';
 import '../sport/sport_screen.dart';
 import '../tasks/task_form_screen.dart';
+import '../tasks/tasks_screen.dart';
 import '../wellbeing/wellbeing_entry_screen.dart';
 import '../wellbeing/wellbeing_screen.dart';
 
-/// Root shell: Accueil / Planning / Sport / Bien-être / Plus.
+/// Root shell: Accueil / Tasks / Sport / Bien-être / Plus.
 class MainShell extends StatefulWidget {
   final int initialIndex;
 
@@ -27,7 +27,7 @@ class MainShellState extends State<MainShell> {
   late int _index;
   final GlobalKey<SportScreenState> _sportKey = GlobalKey<SportScreenState>();
 
-  static const int _tabCount = 4; // Accueil, Planning, Sport, Bien-être
+  static const int _tabCount = 4; // Accueil, Tasks, Sport, Bien-être
   static const int _moreIndex = 4;
 
   @override
@@ -45,7 +45,7 @@ class MainShellState extends State<MainShell> {
   }
 
   Future<void> _startSessionShortcut() async {
-    goToTab(2);
+    goToTab(2); // Sport
     await Future<void>.delayed(const Duration(milliseconds: 50));
     await _sportKey.currentState?.startSessionFromShortcut();
   }
@@ -53,6 +53,13 @@ class MainShellState extends State<MainShell> {
   Future<void> _openPuzzle() async {
     await Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => const PuzzleScreen()),
+    );
+    BloomRefresh.notify();
+  }
+
+  Future<void> _openSettings() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const SettingsScreen()),
     );
     BloomRefresh.notify();
   }
@@ -86,9 +93,7 @@ class MainShellState extends State<MainShell> {
       case 'puzzle':
         await _openPuzzle();
       case 'settings':
-        await Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => const SettingsScreen()),
-        );
+        await _openSettings();
     }
   }
 
@@ -101,14 +106,10 @@ class MainShellState extends State<MainShell> {
           HomeScreen(
             onOpenSport: () => goToTab(2),
             onOpenWellbeing: () => goToTab(3),
-            onOpenPlanning: () => goToTab(1),
             onOpenTasks: () => goToTab(1),
             onOpenPuzzle: _openPuzzle,
-            onOpenSettings: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const SettingsScreen()),
-              );
-            },
+            onOpenGoogleCalendar: _openSettings,
+            onOpenSettings: _openSettings,
             onAddTask: () async {
               await Navigator.of(context).push(
                 MaterialPageRoute(builder: (_) => const TaskFormScreen()),
@@ -141,7 +142,7 @@ class MainShellState extends State<MainShell> {
             },
             onStartSession: _startSessionShortcut,
           ),
-          const PlanningScreen(),
+          const TasksScreen(),
           SportScreen(key: _sportKey),
           const WellbeingScreen(),
         ],
@@ -162,9 +163,9 @@ class MainShellState extends State<MainShell> {
             label: 'Accueil',
           ),
           NavigationDestination(
-            icon: Icon(Icons.calendar_month_outlined),
-            selectedIcon: Icon(Icons.calendar_month),
-            label: 'Planning',
+            icon: Icon(Icons.checklist_outlined),
+            selectedIcon: Icon(Icons.checklist),
+            label: 'Tasks',
           ),
           NavigationDestination(
             icon: Icon(Icons.fitness_center_outlined),

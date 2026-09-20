@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'google_calendar.dart';
+
 /// Local app preferences (theme, reminders). Persisted in Hive.
 class AppSettings {
   final ThemeMode themeMode;
@@ -9,6 +11,7 @@ class AppSettings {
   final bool puzzleReminders;
   final int reminderHour;
   final int reminderMinute;
+  final GoogleCalendarPrefs googleCalendar;
 
   const AppSettings({
     this.themeMode = ThemeMode.system,
@@ -18,6 +21,7 @@ class AppSettings {
     this.puzzleReminders = false,
     this.reminderHour = 9,
     this.reminderMinute = 0,
+    this.googleCalendar = const GoogleCalendarPrefs(),
   });
 
   AppSettings copyWith({
@@ -28,6 +32,7 @@ class AppSettings {
     bool? puzzleReminders,
     int? reminderHour,
     int? reminderMinute,
+    GoogleCalendarPrefs? googleCalendar,
   }) {
     return AppSettings(
       themeMode: themeMode ?? this.themeMode,
@@ -37,6 +42,7 @@ class AppSettings {
       puzzleReminders: puzzleReminders ?? this.puzzleReminders,
       reminderHour: reminderHour ?? this.reminderHour,
       reminderMinute: reminderMinute ?? this.reminderMinute,
+      googleCalendar: googleCalendar ?? this.googleCalendar,
     );
   }
 
@@ -48,6 +54,8 @@ class AppSettings {
         'puzzleReminders': puzzleReminders,
         'reminderHour': reminderHour,
         'reminderMinute': reminderMinute,
+        // Non-secret prefs only — never export OAuth tokens.
+        'googleCalendar': googleCalendar.toMap(),
       };
 
   factory AppSettings.fromMap(Map<dynamic, dynamic>? map) {
@@ -61,6 +69,9 @@ class AppSettings {
       puzzleReminders: data['puzzleReminders'] as bool? ?? false,
       reminderHour: (data['reminderHour'] as num?)?.toInt() ?? 9,
       reminderMinute: (data['reminderMinute'] as num?)?.toInt() ?? 0,
+      googleCalendar: GoogleCalendarPrefs.fromMap(
+        data['googleCalendar'] as Map?,
+      ),
     );
   }
 

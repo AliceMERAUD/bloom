@@ -19,6 +19,12 @@ dependencies:
   timezone: ^0.10.0
   path_provider: ^2.1.5
   flutter_timezone: ^5.1.0
+  google_sign_in: ^6.2.2
+  googleapis: ^13.2.0
+  extension_google_sign_in_as_googleapis_auth: ^2.0.12
+  flutter_secure_storage: ^9.2.4
+  url_launcher: ^6.3.1
+  googleapis_auth: ^2.3.4
 
 dev_dependencies:
   flutter_test:

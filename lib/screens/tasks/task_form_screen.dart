@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../models/google_calendar.dart';
 import '../../models/task.dart';
+import '../../services/google_calendar/google_calendar_service.dart';
 import '../../services/sport_activity_service.dart';
 import '../../services/task_service.dart';
 import '../sport/sport_bag_checklist_sheet.dart';
@@ -37,6 +39,9 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
   int _reminderMinutesBefore = 0;
   String? _sportId;
   bool _saving = false;
+  String? _googleCalendarEventId;
+  bool _gcalConnected = false;
+  bool _gcalBusy = false;
 
   bool get _isEditing => widget.task != null;
 
@@ -55,11 +60,19 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
       _reminderEnabled = task.reminderEnabled;
       _reminderMinutesBefore = task.reminderMinutesBefore;
       _sportId = task.sportId;
+      _googleCalendarEventId = task.googleCalendarEventId;
     } else {
       _dueDate = widget.initialDueDate;
       _dueTime = widget.initialDueTime;
       _category = widget.initialCategory ?? TaskCategory.other;
     }
+    _loadGcalConnection();
+  }
+
+  Future<void> _loadGcalConnection() async {
+    final connected = await GoogleCalendarService.isConnected;
+    if (!mounted) return;
+    setState(() => _gcalConnected = connected);
   }
 
   @override
@@ -67,6 +80,105 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
     _titleController.dispose();
     _descriptionController.dispose();
     super.dispose();
+  }
+
+  BloomTask _draftFromForm(BloomTask base) {
+    final linkedSportId = _category == TaskCategory.sport ? _sportId : null;
+    return base.copyWith(
+      title: _titleController.text.trim().isEmpty
+          ? base.title
+          : _titleController.text.trim(),
+      description: _descriptionController.text.trim().isEmpty
+          ? null
+          : _descriptionController.text.trim(),
+      clearDescription: _descriptionController.text.trim().isEmpty,
+      category: _category,
+      priority: _priority,
+      recurrence: _recurrence,
+      dueDate: _dueDate,
+      clearDueDate: _dueDate == null,
+      dueTime: _dueTime,
+      clearDueTime: _dueTime == null,
+      reminderEnabled: _reminderEnabled && _dueDate != null,
+      reminderMinutesBefore: _reminderMinutesBefore,
+      sportId: linkedSportId,
+      clearSportId: linkedSportId == null,
+      googleCalendarEventId: _googleCalendarEventId,
+      clearGoogleCalendarEventId: _googleCalendarEventId == null,
+    );
+  }
+
+  void _showGcalError(Object e) {
+    final message = e is GoogleCalendarException ? e.message : '$e';
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
+  }
+
+  Future<void> _addToGoogleCalendar() async {
+    final existing = widget.task;
+    if (existing == null || _dueDate == null) return;
+
+    setState(() => _gcalBusy = true);
+    try {
+      final draft = _draftFromForm(existing);
+      final eventId = await GoogleCalendarService.createEventForTask(draft);
+      final linked = await GoogleCalendarService.linkTaskEvent(draft, eventId);
+      if (!mounted) return;
+      setState(() => _googleCalendarEventId = linked.googleCalendarEventId);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Ajoutée à Google Calendar.')),
+      );
+    } on GoogleCalendarException catch (e) {
+      if (e.message.contains('existe déjà')) {
+        if (!mounted) return;
+        final update = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Événement déjà lié'),
+            content: Text(e.message),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Annuler'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('Mettre à jour'),
+              ),
+            ],
+          ),
+        );
+        if (update == true) await _updateGoogleCalendar();
+      } else if (mounted) {
+        _showGcalError(e);
+      }
+    } catch (e) {
+      if (mounted) _showGcalError(e);
+    } finally {
+      if (mounted) setState(() => _gcalBusy = false);
+    }
+  }
+
+  Future<void> _updateGoogleCalendar() async {
+    final existing = widget.task;
+    if (existing == null || _dueDate == null) return;
+
+    setState(() => _gcalBusy = true);
+    try {
+      final draft = _draftFromForm(existing);
+      await GoogleCalendarService.updateEventForTask(draft);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Événement Google Calendar mis à jour.')),
+      );
+    } on GoogleCalendarException catch (e) {
+      if (mounted) _showGcalError(e);
+    } catch (e) {
+      if (mounted) _showGcalError(e);
+    } finally {
+      if (mounted) setState(() => _gcalBusy = false);
+    }
   }
 
   Future<void> _pickDate() async {
@@ -160,6 +272,8 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
             reminderMinutesBefore: _reminderMinutesBefore,
             sportId: linkedSportId,
             clearSportId: linkedSportId == null,
+            googleCalendarEventId: _googleCalendarEventId,
+            clearGoogleCalendarEventId: _googleCalendarEventId == null,
           ),
         );
       } else {
@@ -185,25 +299,67 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
   }
 
   Future<void> _delete() async {
+    final task = widget.task!;
+    final hasGcal = _googleCalendarEventId != null;
+    var alsoDeleteGcal = false;
+
     final ok = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Supprimer la tâche'),
-        content: const Text('Cette action est définitive.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Annuler'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Supprimer'),
-          ),
-        ],
-      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setDialogState) {
+            return AlertDialog(
+              title: const Text('Supprimer la tâche'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Cette action est définitive.'),
+                  if (hasGcal) ...[
+                    const SizedBox(height: 12),
+                    CheckboxListTile(
+                      contentPadding: EdgeInsets.zero,
+                      controlAffinity: ListTileControlAffinity.leading,
+                      title: const Text(
+                        'Supprimer également l’événement Google Calendar',
+                      ),
+                      value: alsoDeleteGcal,
+                      onChanged: (v) =>
+                          setDialogState(() => alsoDeleteGcal = v ?? false),
+                    ),
+                  ],
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, false),
+                  child: const Text('Annuler'),
+                ),
+                FilledButton(
+                  onPressed: () => Navigator.pop(ctx, true),
+                  child: const Text('Supprimer'),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
     if (ok != true) return;
-    await TaskService.deleteTask(widget.task!.id);
+
+    if (alsoDeleteGcal && hasGcal) {
+      try {
+        await GoogleCalendarService.deleteEventForTask(
+          task.copyWith(googleCalendarEventId: _googleCalendarEventId),
+        );
+      } on GoogleCalendarException catch (e) {
+        if (mounted) _showGcalError(e);
+      } catch (e) {
+        if (mounted) _showGcalError(e);
+      }
+    }
+
+    await TaskService.deleteTask(task.id);
     if (mounted) Navigator.pop(context);
   }
 
@@ -215,6 +371,45 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
       await TaskService.completeTask(task.id);
     }
     if (mounted) Navigator.pop(context);
+  }
+
+  Widget? _googleCalendarSection() {
+    if (!_isEditing || _dueDate == null || !_gcalConnected) return null;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const SizedBox(height: 16),
+        Text(
+          'Google Calendar',
+          style: Theme.of(context).textTheme.titleSmall,
+        ),
+        const SizedBox(height: 8),
+        if (_googleCalendarEventId == null)
+          OutlinedButton.icon(
+            onPressed: _gcalBusy ? null : _addToGoogleCalendar,
+            icon: const Icon(Icons.event_available),
+            label: const Text('Ajouter à Google Calendar'),
+          )
+        else ...[
+          const Text(
+            '✓ Ajoutée à Google Calendar',
+            style: TextStyle(fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 8),
+          OutlinedButton(
+            onPressed: _gcalBusy ? null : _updateGoogleCalendar,
+            child: const Text('Mettre à jour'),
+          ),
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            onPressed: () => GoogleCalendarService.openGoogleCalendarApp(),
+            icon: const Icon(Icons.open_in_new, size: 18),
+            label: const Text('Ouvrir Google Calendar'),
+          ),
+        ],
+      ],
+    );
   }
 
   @override
@@ -414,6 +609,7 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
               },
             ),
           ],
+          if (_googleCalendarSection() case final gcal?) gcal,
           const SizedBox(height: 20),
           FilledButton(
             onPressed: _saving ? null : _save,

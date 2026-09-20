@@ -4,8 +4,11 @@ import '../../app/theme.dart';
 import '../../models/wellbeing_enums.dart';
 import '../../services/bloom_refresh.dart';
 import '../../services/dashboard_service.dart';
+import '../../services/google_calendar/google_calendar_service.dart';
+import '../../services/settings_service.dart';
 import '../../services/workout_session_service.dart';
 import '../../widgets/common/bloom_widgets.dart';
+import '../settings/settings_screen.dart';
 
 /// Personalized local-first home dashboard.
 class HomeScreen extends StatefulWidget {
@@ -13,7 +16,7 @@ class HomeScreen extends StatefulWidget {
   final VoidCallback? onOpenWellbeing;
   final VoidCallback? onOpenTasks;
   final VoidCallback? onOpenPuzzle;
-  final VoidCallback? onOpenPlanning;
+  final VoidCallback? onOpenGoogleCalendar;
   final VoidCallback? onOpenSettings;
   final VoidCallback? onAddTask;
   final VoidCallback? onAddWellbeing;
@@ -26,7 +29,7 @@ class HomeScreen extends StatefulWidget {
     this.onOpenWellbeing,
     this.onOpenTasks,
     this.onOpenPuzzle,
-    this.onOpenPlanning,
+    this.onOpenGoogleCalendar,
     this.onOpenSettings,
     this.onAddTask,
     this.onAddWellbeing,
@@ -116,12 +119,12 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               const SizedBox(height: 20),
               BloomSection(
-                title: 'Planning & tâches',
+                title: 'Google Calendar',
                 icon: Icons.calendar_month,
                 accent: BloomTheme.planning,
-                child: _PlanningCard(
-                  data: data,
-                  onOpen: widget.onOpenPlanning ?? widget.onOpenTasks,
+                child: _GoogleCalendarCard(
+                  onOpenSettings:
+                      widget.onOpenGoogleCalendar ?? widget.onOpenSettings,
                 ),
               ),
               const SizedBox(height: 20),
@@ -374,70 +377,71 @@ class _TodayCard extends StatelessWidget {
   }
 }
 
-class _PlanningCard extends StatelessWidget {
-  final DashboardSnapshot data;
-  final VoidCallback? onOpen;
+class _GoogleCalendarCard extends StatelessWidget {
+  final VoidCallback? onOpenSettings;
 
-  const _PlanningCard({required this.data, this.onOpen});
+  const _GoogleCalendarCard({this.onOpenSettings});
+
+  Future<void> _openSettings(BuildContext context) async {
+    if (onOpenSettings != null) {
+      onOpenSettings!();
+      return;
+    }
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const SettingsScreen()),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
-    final count = data.todayPlanningCount;
-    final upcoming = data.upcomingPlanning;
+    final prefs = SettingsService.current.googleCalendar;
+    final email = prefs.accountEmail;
+
+    if (email == null) {
+      return BloomEmptyState(
+        icon: Icons.calendar_month_outlined,
+        accent: BloomTheme.planning,
+        message: 'Connecte Google Calendar pour synchroniser tes tâches',
+        actionLabel: 'Connecter',
+        onAction: () => _openSettings(context),
+      );
+    }
+
+    final calendarName = prefs.selectedCalendarName ?? 'Calendrier';
 
     return BloomCard(
       accent: BloomTheme.planning,
-      onTap: onOpen,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
+          const Text(
+            'Connecté',
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 4),
+          Text(email, style: Theme.of(context).textTheme.bodyMedium),
+          const SizedBox(height: 4),
+          Text(
+            calendarName,
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
             children: [
-              const Text('📅', style: TextStyle(fontSize: 20)),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  count == 0
-                      ? 'Rien de prévu aujourd’hui'
-                      : 'Aujourd’hui : $count événement${count > 1 ? 's' : ''}',
-                  style: const TextStyle(fontWeight: FontWeight.w600),
-                ),
+              FilledButton.tonalIcon(
+                onPressed: () => GoogleCalendarService.openGoogleCalendarApp(),
+                icon: const Icon(Icons.open_in_new, size: 18),
+                label: const Text('Ouvrir Google Calendar'),
               ),
-              TextButton(
-                onPressed: onOpen,
-                child: const Text('Ouvrir →'),
+              OutlinedButton.icon(
+                onPressed: () => _openSettings(context),
+                icon: const Icon(Icons.settings_outlined, size: 18),
+                label: const Text('Paramètres'),
               ),
             ],
           ),
-          if (data.dueTodayTaskCount > 0 || data.pendingTaskCount > 0) ...[
-            const SizedBox(height: 6),
-            Text(
-              data.dueTodayTaskCount > 0
-                  ? '${data.dueTodayTaskCount} tâche(s) aujourd’hui'
-                  : '${data.pendingTaskCount} tâche(s) en attente',
-              style: Theme.of(context).textTheme.bodyMedium,
-            ),
-          ],
-          if (upcoming.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Text(
-              'À venir',
-              style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-            ),
-            const SizedBox(height: 6),
-            for (final item in upcoming)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 4),
-                child: Text(
-                  item.timeLabel == null
-                      ? '${item.title} · ${item.kindLabel}'
-                      : '${item.title} — ${item.timeLabel}',
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
-              ),
-          ],
         ],
       ),
     );

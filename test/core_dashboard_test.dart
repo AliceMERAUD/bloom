@@ -43,19 +43,19 @@ void main() {
     expect(find.text('Accueil'), findsOneWidget);
     expect(find.text('Sport'), findsWidgets);
     expect(find.text('Bien-être'), findsWidgets);
-    expect(find.text('Planning'), findsWidgets);
+    expect(find.text('Tasks'), findsWidgets);
     expect(find.text('Plus'), findsOneWidget);
     expect(find.text('Bonjour'), findsOneWidget);
   });
 
-  testWidgets('navigation bas vers Planning / Sport / Bien-être / Plus', (tester) async {
+  testWidgets('navigation bas vers Tasks / Sport / Bien-être / Plus', (tester) async {
     await tester.pumpWidget(const BloomApp());
     await tester.pump();
 
-    await tester.tap(find.text('Planning').last);
+    await tester.tap(find.text('Tasks').last);
     await tester.pump();
     expect(find.byType(MainShell), findsOneWidget);
-    expect(find.text('Mes tâches'), findsOneWidget);
+    expect(find.text('Les petites choses à faire 🌱'), findsOneWidget);
 
     await tester.tap(find.text('Sport').last);
     await tester.pump();
